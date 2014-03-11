@@ -25,6 +25,9 @@ LDLIBS = -lOGDF -lCOIN
 BINARIES = stp-solver
 OBJS = 
 
+run: stp-solver
+	./stp-solver data/B/b01.stp
+
 all: $(BINARIES)
 
 stp-solver: stp-solver.o

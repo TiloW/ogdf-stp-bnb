@@ -1,5 +1,6 @@
 #include <iostream>
 #include <chrono>
+#include <limits>
 
 #include <ogdf/basic/Graph.h>
 #include <ogdf/basic/List.h>
@@ -11,9 +12,25 @@ using namespace ogdf;
 using namespace std::chrono;
 
 /**
+ * Used for comparing edges by their respective weight.
+ */
+class AdjEdgeComparer
+{
+private:
+	EdgeArray<double> m_weights;
+public:
+	AdjEdgeComparer(EdgeArray<double> weights) : m_weights(weights) {}	
+	int compare(const adjEntry &adj1, const adjEntry &adj2) const {
+		return m_weights[adj1->theEdge()] - m_weights[adj2->theEdge()];
+	}
+	OGDF_AUGMENT_COMPARER(adjEntry)
+};
+
+/**
  * Outputs a text describing how to use this program.
  */
-void printHelp() {
+void printHelp()
+{
 	std::cout << "You need to provide a STP file containing the "
 	  "Steiner-tree problem. The algorithm will then find the optimal "
           "Solution and print the total cost." << endl;
@@ -25,7 +42,7 @@ void printHelp() {
  *
  * \param graph
  *	the Graph containing both steiner and terminal nodes
- * \param weight
+ * \param weights
  *	the weight of each edge
  * \param terminals
  *	the set of terminal nodes, as opposed to steiner nodes
@@ -33,11 +50,45 @@ void printHelp() {
  *	mapping for each node whether it is a terminal or a steiner node
  * \param tree
  *	will hold the resulting tree
+ * \param intialCall
+ *	true for the inital call of this algorithm
+ *	is set to false during recursion
+ * \param upperBound
+ * 	All solutions with higher costs will be ignored
  *
  * \return
  *	the total cost of the steiner tree
  */
-double calcSolution(Graph &graph, EdgeArray<double> weight, List<node> &terminals, NodeArray<bool> &isTerminal,  Graph &tree) {
+double calcSolution(
+  const Graph &graph, 
+  const EdgeArray<double> weights, 
+  const List<node> &terminals, 
+  const NodeArray<bool> &isTerminal, 
+  Graph &tree, 
+  bool initialCall = true, 
+  double upperBound = 0,
+  AdjEdgeComparer *comp = NULL)
+{
+	if(initialCall) {
+		tree.clear();
+		comp = new AdjEdgeComparer(weights);
+	}
+
+	// calculate penalties for nodes
+	NodeArray<double> penalties(graph, std::numeric_limits<double>::max());
+	forall_listiterators(node, it, terminals) {
+		List<adjEntry> adjEntries;
+		graph.adjEntries(*it, adjEntries);
+		// penalty for node with only one (or less) edge is infinite
+		// because the respective edge must be chosen (or there is no solution)
+		if(adjEntries.size() > 1) {
+			adjEntries.quicksort(*comp);
+			edge e1 = adjEntries.popFrontRet()->theEdge();
+			edge e2 = adjEntries.front()->theEdge();
+			penalties[*it] = weights[e2] - weights[e1];
+		}
+	}
+
 	return 0;
 }
 
@@ -46,7 +97,8 @@ double calcSolution(Graph &graph, EdgeArray<double> weight, List<node> &terminal
  * Executes the branch and bound algorithm and writes the result to SVG and
  * command line.
  */
-int main(int argc, char* argv[]) {
+int main(int argc, char* argv[])
+{
 	if(argc != 2) {
 		printHelp();
 	}
@@ -55,10 +107,21 @@ int main(int argc, char* argv[]) {
 		List<node> terminals;
 		NodeArray<bool> isTerminal(graph);
 		if(GraphIO::readSTP(graph, terminals, isTerminal, argv[1])) {
-			cout << "starting algorithm" << endl;
+			Graph tree;
+			EdgeArray<double> weights(graph);
+
+			// EdgeWeightedGraph will be removed soon
+			edge e;
+			forall_edges(e, graph) {
+				weights[e] = graph.weight(e);
+			}	
+
+			cout << "starting algorithm.." << endl;
+
 			high_resolution_clock::time_point startTime = high_resolution_clock::now();
-			double totalCost = 0; // TODOT
+			double totalCost = calcSolution(graph, weights, terminals, isTerminal, tree);
 			duration<double> timeSpan = duration_cast<duration<double>>(high_resolution_clock::now() - startTime);
+			
 			cout << "Calculation finished after " << timeSpan.count() << " seconds." << endl;
 			cout << "The optimal solution costs " << totalCost << "." << endl;
 		}
