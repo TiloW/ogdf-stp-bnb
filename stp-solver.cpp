@@ -1,4 +1,5 @@
 #include <iostream>
+#include <chrono>
 
 #include <ogdf/basic/Graph.h>
 #include <ogdf/basic/List.h>
@@ -7,6 +8,7 @@
 #include <ogdf/fileformats/GraphIO.h>
 
 using namespace ogdf;
+using namespace std::chrono;
 
 /**
  * Outputs a text describing how to use this program.
@@ -41,7 +43,7 @@ double calcSolution(Graph &graph, EdgeArray<double> weight, List<node> &terminal
 
 /**
  * Checks the provided command line arguments for validity.
- * Executes the b&b algorithm and writes the result to SVG and
+ * Executes the branch and bound algorithm and writes the result to SVG and
  * command line.
  */
 int main(int argc, char* argv[]) {
@@ -53,6 +55,12 @@ int main(int argc, char* argv[]) {
 		List<node> terminals;
 		NodeArray<bool> isTerminal(graph);
 		if(GraphIO::readSTP(graph, terminals, isTerminal, argv[1])) {
+			cout << "starting algorithm" << endl;
+			high_resolution_clock::time_point startTime = high_resolution_clock::now();
+			double totalCost = 0; // TODOT
+			duration<double> timeSpan = duration_cast<duration<double>>(high_resolution_clock::now() - startTime);
+			cout << "Calculation finished after " << timeSpan.count() << " seconds." << endl;
+			cout << "The optimal solution costs " << totalCost << "." << endl;
 		}
 		else {
 			std::cerr << "unable to read file: " << argv[1] << endl;
