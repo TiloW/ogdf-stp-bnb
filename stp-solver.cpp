@@ -3,6 +3,7 @@
 #include <limits>
 
 #include <ogdf/basic/Graph.h>
+#include <ogdf/basic/GraphCopy.h>
 #include <ogdf/basic/List.h>
 #include <ogdf/basic/EdgeArray.h>
 #include <ogdf/basic/NodeArray.h>
@@ -36,6 +37,68 @@ void printHelp()
           "Solution and print the total cost." << endl;
 }
 
+double bnbInternal(
+  Graph &graph, 
+  EdgeArray<double> weights, 
+  List<node> &terminals, 
+  NodeArray<bool> &isTerminal, 
+  Graph &tree, 
+  double upperBound,
+  AdjEdgeComparer &comp)
+{	
+	double result = std::numeric_limits<double>::max();
+	// TODO: compare bounds
+
+	if(terminals.size() < 2) {
+		result = 0;
+	} 
+	else {
+		edge branchingEdge = NULL;
+		double maxPenalty = 0;
+
+		// calculate penalties for nodes
+		forall_listiterators(node, it, terminals) {
+			List<adjEntry> adjEntries;
+			graph.adjEntries(*it, adjEntries);
+
+			if(adjEntries.size() > 0) {
+				adjEntries.quicksort(comp);
+				edge e1 = (*(adjEntries.get(0)))->theEdge();
+				
+				if(adjEntries.size() > 1) {
+					edge e2 = (*(adjEntries.get(1)))->theEdge();
+
+					double tmp = weights[e2] - weights[e1];
+					if(tmp >= maxPenalty) {
+						maxPenalty = tmp;
+						branchingEdge = e1;
+					}
+				} else {
+					if(!adjEntries.empty()) {
+						branchingEdge = e1;
+					}
+					break;
+				}
+			} else {
+				break;
+			}
+		}
+
+		// branching edge has been found or there is no feasible solution	
+		if(branchingEdge != NULL && weights[branchingEdge] < std::numeric_limits<double>::max()) {
+			// include the edge
+			// TODO
+
+			// exclude the edge
+			double x = weights[branchingEdge];
+			weights[branchingEdge] = std::numeric_limits<double>::max();
+			result = bnbInternal(graph, weights, terminals, isTerminal, tree, upperBound, comp);
+			weights[branchingEdge] = x;
+		}
+	}
+	return result;
+}
+
 /**
  * Yields a optimal steiner tree for the given STP instance.
  * Applies Shore, Foulds and Gibbons' branch and bound algorithm.
@@ -50,11 +113,6 @@ void printHelp()
  *	mapping for each node whether it is a terminal or a steiner node
  * \param tree
  *	will hold the resulting tree
- * \param intialCall
- *	true for the inital call of this algorithm
- *	is set to false during recursion
- * \param upperBound
- * 	All solutions with higher costs will be ignored
  *
  * \return
  *	the total cost of the steiner tree
@@ -64,61 +122,36 @@ double calcSolution(
   const EdgeArray<double> weights, 
   const List<node> &terminals, 
   const NodeArray<bool> &isTerminal, 
-  Graph &tree, 
-  bool initialCall = true, 
-  double upperBound = 0,
-  AdjEdgeComparer *comp = NULL)
+  Graph &tree)
 {
-	if(initialCall) {
-		tree.clear();
-		comp = new AdjEdgeComparer(weights);
+	tree.clear();
+	
+	GraphCopy copyGraph(graph);
+	EdgeArray<double> copyWeights(copyGraph);
+	List<node> copyTerminals;
+	NodeArray<bool> copyIsTerminal(copyGraph, false);
+
+	edge e;
+	forall_edges(e, copyGraph) {
+		copyWeights[e] = weights[copyGraph.original(e)];
 	}
 
-	edge branchingEdge = NULL;
-	double maxPenalty = 0;
-
-	// calculate penalties for nodes
 	forall_listiterators(node, it, terminals) {
-		List<adjEntry> adjEntries;
-		graph.adjEntries(*it, adjEntries);
-
-		if(adjEntries.size() > 0) {
-			adjEntries.quicksort(*comp);
-			edge e1 = (*(adjEntries.get(0)))->theEdge();
-			
-			if(adjEntries.size() > 1) {
-				edge e2 = (*(adjEntries.get(1)))->theEdge();
-
-				double tmp = weights[e2] - weights[e1];
-				if(tmp >= maxPenalty) {
-					maxPenalty = tmp;
-					branchingEdge = e1;
-				}
-			} else {
-				if(!adjEntries.empty()) {
-					branchingEdge = e1;
-				}
-				break;
-			}
-		} else {
-			break;
-		}
-	}
-
-
-	// branching edge has been found or there is no feasible solution	
-	double result = std::numeric_limits<double>::max();
-	if(branchingEdge != NULL) {
-		// TODO
-		result = 0;
+		node v = copyGraph.copy(*it);
+		copyTerminals.pushFront(v);
+		copyIsTerminal[v] = true;	
 	}
 	
-
-	if(initialCall) {
-		delete comp;
-	}
-
-	return result;
+	AdjEdgeComparer comp(copyWeights);
+	
+	return bnbInternal(
+	  copyGraph, 
+	  copyWeights, 
+	  copyTerminals, 
+	  copyIsTerminal, 
+	  tree, 
+	  std::numeric_limits<double>::max(), 
+	  comp); 
 }
 
 /**
