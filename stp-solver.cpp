@@ -74,22 +74,51 @@ double calcSolution(
 		comp = new AdjEdgeComparer(weights);
 	}
 
+	edge branchingEdge = NULL;
+	double maxPenalty = 0;
+
 	// calculate penalties for nodes
-	NodeArray<double> penalties(graph, std::numeric_limits<double>::max());
 	forall_listiterators(node, it, terminals) {
 		List<adjEntry> adjEntries;
 		graph.adjEntries(*it, adjEntries);
-		// penalty for node with only one (or less) edge is infinite
-		// because the respective edge must be chosen (or there is no solution)
-		if(adjEntries.size() > 1) {
+
+		if(adjEntries.size() > 0) {
 			adjEntries.quicksort(*comp);
-			edge e1 = adjEntries.popFrontRet()->theEdge();
-			edge e2 = adjEntries.front()->theEdge();
-			penalties[*it] = weights[e2] - weights[e1];
+			edge e1 = (*(adjEntries.get(0)))->theEdge();
+			
+			if(adjEntries.size() > 1) {
+				edge e2 = (*(adjEntries.get(1)))->theEdge();
+
+				double tmp = weights[e2] - weights[e1];
+				if(tmp >= maxPenalty) {
+					maxPenalty = tmp;
+					branchingEdge = e1;
+				}
+			} else {
+				if(!adjEntries.empty()) {
+					branchingEdge = e1;
+				}
+				break;
+			}
+		} else {
+			break;
 		}
 	}
 
-	return 0;
+
+	// branching edge has been found or there is no feasible solution	
+	double result = std::numeric_limits<double>::max();
+	if(branchingEdge != NULL) {
+		// TODO
+		result = 0;
+	}
+	
+
+	if(initialCall) {
+		delete comp;
+	}
+
+	return result;
 }
 
 /**
@@ -110,7 +139,7 @@ int main(int argc, char* argv[])
 			Graph tree;
 			EdgeArray<double> weights(graph);
 
-			// EdgeWeightedGraph will be removed soon
+			// EdgeWeightedGraph will be removed soon from OGDF
 			edge e;
 			forall_edges(e, graph) {
 				weights[e] = graph.weight(e);
