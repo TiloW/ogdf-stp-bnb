@@ -39,7 +39,7 @@ void printHelp()
 
 double bnbInternal(
   Graph &graph, 
-  EdgeArray<double> weights, 
+  EdgeArray<double> &weights, 
   List<node> &terminals, 
   Graph &tree, 
   double upperBound,
@@ -207,7 +207,7 @@ double bnbInternal(
  */
 double calcSolution(
   const Graph &graph, 
-  const EdgeArray<double> weights, 
+  const EdgeArray<double> &weights, 
   const List<node> &terminals, 
 //  const NodeArray<bool> &isTerminal, 
   Graph &tree)
