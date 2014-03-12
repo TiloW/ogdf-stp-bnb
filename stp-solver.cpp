@@ -41,25 +41,31 @@ double bnbInternal(
   Graph &graph, 
   EdgeArray<double> weights, 
   List<node> &terminals, 
-  NodeArray<bool> &isTerminal, 
   Graph &tree, 
   double upperBound,
-  AdjEdgeComparer &comp)
-{	
+  AdjEdgeComparer &comp,
+  double prevCost = 0)
+{
+	// TODO: Construct tree	
 	double result = std::numeric_limits<double>::max();
 	// TODO: compare bounds
 
+	cout << terminals.size() << endl;
+
 	if(terminals.size() < 2) {
-		result = 0;
+		result = prevCost;
 	} 
 	else {
 		edge branchingEdge = NULL;
 		double maxPenalty = 0;
 
+		cout << "  calculating penalties" << endl;
 		// calculate penalties for nodes
 		forall_listiterators(node, it, terminals) {
 			List<adjEntry> adjEntries;
+			cout << "  getting entries.." << endl;
 			graph.adjEntries(*it, adjEntries);
+			cout << "  got entries!" << endl;
 
 			if(adjEntries.size() > 0) {
 				adjEntries.quicksort(comp);
@@ -84,16 +90,98 @@ double bnbInternal(
 			}
 		}
 
+		cout << "  before branch" << endl;
+
 		// branching edge has been found or there is no feasible solution	
 		if(branchingEdge != NULL && weights[branchingEdge] < std::numeric_limits<double>::max()) {
-			// include the edge
-			// TODO
+			// first branch: Include the edge
+		
+			cout << "  branching on edge: " << branchingEdge << endl;
+			graph.hideEdge(branchingEdge);
+	
+			// remove source node of edge and calc new edge weights
+			List<edge> edges, hiddenEdges;
+			node nodeToRemove = branchingEdge->source();
+			node targetNode = branchingEdge->target();
+			cout << "  retrieving adjacent edges.." << endl;
+			graph.adjEdges(nodeToRemove, edges);
+			
+			cout << "  starting edge iteration" << endl;
+			forall_listiterators(edge, it, edges) {
+				cout << "  investigating edge " << *it << endl;
+				edge e = *it;	
+				if(e->target() != nodeToRemove) {
+					graph.reverseEdge(e);
+				}
 
-			// exclude the edge
-			double x = weights[branchingEdge];
-			weights[branchingEdge] = std::numeric_limits<double>::max();
-			result = bnbInternal(graph, weights, terminals, isTerminal, tree, upperBound, comp);
-			weights[branchingEdge] = x;
+				edge f = graph.searchEdge(e->source(), targetNode);
+				if(f != NULL) {
+					if(weights[f] < weights[e]) {
+						hiddenEdges.pushFront(e);
+						graph.hideEdge(e);
+					}
+					else {
+						hiddenEdges.pushFront(e);
+						graph.hideEdge(f);
+					}
+				}
+				graph.moveTarget(e, targetNode);
+			}
+			graph.delNode(nodeToRemove);
+
+			cout << "  node removed from graph" << endl;
+			
+			// remove node from terminals too
+			ListIterator<node> it  = terminals.search(nodeToRemove),
+			                   it2 = terminals.search(targetNode);
+			bool remNodeIsTerminal = it.valid();
+			if(remNodeIsTerminal) {
+				terminals.del(it);
+			}
+			bool targetNodeIsTerminal = it2.valid();
+			if(!targetNodeIsTerminal) {
+				terminals.pushFront(targetNode);
+			}
+
+			cout << "  node removed from terminal set" << endl;
+			
+			cout << "  entering inclusion branch" << endl;
+			// calculate result on modified graph
+			result = bnbInternal(graph, weights, terminals, tree, upperBound, comp, weights[branchingEdge] + prevCost);
+			
+			// restore previous graph	
+			node restoredNode = graph.newNode();
+			if(remNodeIsTerminal) {
+				terminals.pushFront(restoredNode);
+			}
+			if(!targetNodeIsTerminal) {
+				terminals.del(terminals.search(targetNode));
+			}
+		       
+			cout << "  moving edges to old positions" << endl; 	
+			forall_listiterators(edge, it, edges) {
+				graph.moveTarget(*it, restoredNode);
+			}
+
+			cout << "  revealing edges" << endl;
+			forall_listiterators(edge, it, hiddenEdges) {
+				cout << "  restoring edge: " << *it << endl;
+				graph.restoreEdge(*it);
+				cout << "  edge " << *it << " restored." << endl;
+			}
+
+			cout << "  entering exlusion branch" << endl;
+			// sencond branch: Exclude the edge
+			double exEdgeResult = bnbInternal(graph, weights, terminals, tree, upperBound, comp, prevCost);
+
+			// finally: restore the branching edge
+			cout << "  restoring branchingEdge";
+			graph.restoreEdge(branchingEdge);
+			cout << "  rstep finished!" << endl;
+
+			if(exEdgeResult < result) {
+				result = exEdgeResult;
+			}
 		}
 	}
 	return result;
@@ -121,7 +209,7 @@ double calcSolution(
   const Graph &graph, 
   const EdgeArray<double> weights, 
   const List<node> &terminals, 
-  const NodeArray<bool> &isTerminal, 
+//  const NodeArray<bool> &isTerminal, 
   Graph &tree)
 {
 	tree.clear();
@@ -129,7 +217,6 @@ double calcSolution(
 	GraphCopy copyGraph(graph);
 	EdgeArray<double> copyWeights(copyGraph);
 	List<node> copyTerminals;
-	NodeArray<bool> copyIsTerminal(copyGraph, false);
 
 	edge e;
 	forall_edges(e, copyGraph) {
@@ -139,7 +226,6 @@ double calcSolution(
 	forall_listiterators(node, it, terminals) {
 		node v = copyGraph.copy(*it);
 		copyTerminals.pushFront(v);
-		copyIsTerminal[v] = true;	
 	}
 	
 	AdjEdgeComparer comp(copyWeights);
@@ -148,7 +234,6 @@ double calcSolution(
 	  copyGraph, 
 	  copyWeights, 
 	  copyTerminals, 
-	  copyIsTerminal, 
 	  tree, 
 	  std::numeric_limits<double>::max(), 
 	  comp); 
@@ -181,7 +266,7 @@ int main(int argc, char* argv[])
 			cout << "starting algorithm.." << endl;
 
 			high_resolution_clock::time_point startTime = high_resolution_clock::now();
-			double totalCost = calcSolution(graph, weights, terminals, isTerminal, tree);
+			double totalCost = calcSolution(graph, weights, terminals, tree);
 			duration<double> timeSpan = duration_cast<duration<double>>(high_resolution_clock::now() - startTime);
 			
 			cout << "Calculation finished after " << timeSpan.count() << " seconds." << endl;
