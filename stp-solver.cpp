@@ -90,9 +90,10 @@ double bnbInternal(
 		
 		// branching edge has been found or there is no feasible solution	
 		if(branchingEdge != NULL && weights[branchingEdge] < std::numeric_limits<double>::max()) {
-			// "remove" branching edge by assigning infinite weight
-			double branchingEdgeWeight = weights[branchingEdge];
-			weights[branchingEdge] = std::numeric_limits<double>::max();
+			// remove branching edge
+			graph.hideEdge(branchingEdge);
+
+			cout << "branching edge " << branchingEdge << endl;
 
 			// first branch: Inclusion of the edge
 			// remove source node of edge and calculate new edge weights
@@ -100,8 +101,10 @@ double bnbInternal(
 			node nodeToRemove = branchingEdge->source();
 			node targetNode = branchingEdge->target();
 		
-			edge e;
-			forall_adj_edges(e, nodeToRemove) {
+			graph.adjEdges(nodeToRemove, edges);
+			forall_listiterators(edge, it, edges) {
+				edge e = *it;
+
 				if(e->target() != nodeToRemove) {
 					graph.reverseEdge(e);
 				}
@@ -139,7 +142,7 @@ double bnbInternal(
 			}
 
 			// calculate result on modified graph
-			result = bnbInternal(graph, weights, terminals, tree, upperBound, comp, branchingEdgeWeight + prevCost);
+			result = bnbInternal(graph, weights, terminals, tree, upperBound, comp, weights[branchingEdge] + prevCost);
 			
 			// restore previous graph	
 			if(remNodeIsTerminal) {
@@ -166,7 +169,7 @@ double bnbInternal(
 			}
 
 			// finally: restore the branching edge
-			weights[branchingEdge] = branchingEdgeWeight;
+			graph.restoreEdge(branchingEdge);
 		}
 	}
 	return result;
