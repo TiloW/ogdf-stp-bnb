@@ -15,16 +15,17 @@ using namespace std::chrono;
 /**
  * Used for comparing edges by their respective weight.
  */
-class AdjEdgeComparer
+class EdgeComparer
 {
 private:
 	EdgeArray<double> m_weights;
 public:
-	AdjEdgeComparer(EdgeArray<double> weights) : m_weights(weights) {}	
-	int compare(const adjEntry &adj1, const adjEntry &adj2) const {
-		return m_weights[adj1->theEdge()] - m_weights[adj2->theEdge()];
+	EdgeComparer(EdgeArray<double> weights) : m_weights(weights) {}	
+	int compare(const edge &e, const edge &f) const {
+		// TODO: check for infinity?
+		return m_weights[e] - m_weights[f];
 	}
-	OGDF_AUGMENT_COMPARER(adjEntry)
+	OGDF_AUGMENT_COMPARER(edge)
 };
 
 /**
@@ -43,36 +44,33 @@ double bnbInternal(
   List<node> &terminals, 
   Graph &tree, 
   double upperBound,
-  AdjEdgeComparer &comp,
+  EdgeComparer &comp,
   double prevCost = 0)
 {
+	cout << terminals.size() << "  |  " << prevCost << endl;
+
 	// TODO: Construct tree	
 	double result = std::numeric_limits<double>::max();
 	// TODO: compare bounds
 
-	cout << terminals.size() << endl;
-
 	if(terminals.size() < 2) {
+		// all terminals are connected
 		result = prevCost;
 	} 
-	else {
+	else {	
 		edge branchingEdge = NULL;
 		double maxPenalty = 0;
 
-		cout << "  calculating penalties" << endl;
 		// calculate penalties for nodes
 		forall_listiterators(node, it, terminals) {
-			List<adjEntry> adjEntries;
-			cout << "  getting entries.." << endl;
-			graph.adjEntries(*it, adjEntries);
-			cout << "  got entries!" << endl;
-
-			if(adjEntries.size() > 0) {
-				adjEntries.quicksort(comp);
-				edge e1 = (*(adjEntries.get(0)))->theEdge();
+			List<edge> edges;
+			graph.adjEdges(*it, edges);
+			if(edges.size() > 0) {
+				edges.quicksort(comp);
+				edge e1 = *(edges.get(0));
 				
-				if(adjEntries.size() > 1) {
-					edge e2 = (*(adjEntries.get(1)))->theEdge();
+				if(edges.size() > 1) {
+					edge e2 = *(edges.get(1));
 
 					double tmp = weights[e2] - weights[e1];
 					if(tmp >= maxPenalty) {
@@ -80,7 +78,7 @@ double bnbInternal(
 						branchingEdge = e1;
 					}
 				} else {
-					if(!adjEntries.empty()) {
+					if(!edges.empty()) {
 						branchingEdge = e1;
 					}
 					break;
@@ -89,49 +87,46 @@ double bnbInternal(
 				break;
 			}
 		}
-
-		cout << "  before branch" << endl;
-
+		
 		// branching edge has been found or there is no feasible solution	
 		if(branchingEdge != NULL && weights[branchingEdge] < std::numeric_limits<double>::max()) {
-			// first branch: Include the edge
-		
-			cout << "  branching on edge: " << branchingEdge << endl;
-			graph.hideEdge(branchingEdge);
-	
-			// remove source node of edge and calc new edge weights
+			// "remove" branching edge by assigning infinite weight
+			double branchingEdgeWeight = weights[branchingEdge];
+			weights[branchingEdge] = std::numeric_limits<double>::max();
+
+			// first branch: Inclusion of the edge
+			// remove source node of edge and calculate new edge weights
 			List<edge> edges, hiddenEdges;
 			node nodeToRemove = branchingEdge->source();
 			node targetNode = branchingEdge->target();
-			cout << "  retrieving adjacent edges.." << endl;
-			graph.adjEdges(nodeToRemove, edges);
-			
-			cout << "  starting edge iteration" << endl;
-			forall_listiterators(edge, it, edges) {
-				cout << "  investigating edge " << *it << endl;
-				edge e = *it;	
+		
+			edge e;
+			forall_adj_edges(e, nodeToRemove) {
 				if(e->target() != nodeToRemove) {
 					graph.reverseEdge(e);
 				}
 
 				edge f = graph.searchEdge(e->source(), targetNode);
+				if(f == NULL) {
+					f = graph.searchEdge(targetNode, e->source());
+				}
 				if(f != NULL) {
 					if(weights[f] < weights[e]) {
 						hiddenEdges.pushFront(e);
 						graph.hideEdge(e);
 					}
 					else {
-						hiddenEdges.pushFront(e);
+						hiddenEdges.pushFront(f);
 						graph.hideEdge(f);
 					}
 				}
 				graph.moveTarget(e, targetNode);
 			}
-			graph.delNode(nodeToRemove);
-
-			cout << "  node removed from graph" << endl;
+			// nodeToRemove is isolated at this point
+			// thus no need to actually remove it
+			// (easier to keep track of CopyGraph mapping)
 			
-			// remove node from terminals too
+			// remove node from terminals tooo
 			ListIterator<node> it  = terminals.search(nodeToRemove),
 			                   it2 = terminals.search(targetNode);
 			bool remNodeIsTerminal = it.valid();
@@ -143,52 +138,42 @@ double bnbInternal(
 				terminals.pushFront(targetNode);
 			}
 
-			cout << "  node removed from terminal set" << endl;
-			
-			cout << "  entering inclusion branch" << endl;
 			// calculate result on modified graph
-			result = bnbInternal(graph, weights, terminals, tree, upperBound, comp, weights[branchingEdge] + prevCost);
+			result = bnbInternal(graph, weights, terminals, tree, upperBound, comp, branchingEdgeWeight + prevCost);
 			
 			// restore previous graph	
-			node restoredNode = graph.newNode();
 			if(remNodeIsTerminal) {
-				terminals.pushFront(restoredNode);
+				terminals.pushFront(nodeToRemove);
 			}
 			if(!targetNodeIsTerminal) {
 				terminals.del(terminals.search(targetNode));
 			}
 		       
-			cout << "  moving edges to old positions" << endl; 	
 			forall_listiterators(edge, it, edges) {
-				graph.moveTarget(*it, restoredNode);
+				graph.moveTarget(*it, nodeToRemove);
 			}
 
-			cout << "  revealing edges" << endl;
 			forall_listiterators(edge, it, hiddenEdges) {
-				cout << "  restoring edge: " << *it << endl;
 				graph.restoreEdge(*it);
-				cout << "  edge " << *it << " restored." << endl;
 			}
 
-			cout << "  entering exlusion branch" << endl;
-			// sencond branch: Exclude the edge
+			// sencond branch: Exclusion of the edge
 			double exEdgeResult = bnbInternal(graph, weights, terminals, tree, upperBound, comp, prevCost);
 
-			// finally: restore the branching edge
-			cout << "  restoring branchingEdge";
-			graph.restoreEdge(branchingEdge);
-			cout << "  rstep finished!" << endl;
-
+			// decide which branch returned best result
 			if(exEdgeResult < result) {
 				result = exEdgeResult;
 			}
+
+			// finally: restore the branching edge
+			weights[branchingEdge] = branchingEdgeWeight;
 		}
 	}
 	return result;
 }
 
 /**
- * Yields a optimal steiner tree for the given STP instance.
+ * Yields an optimal steiner tree for the given STP instance.
  * Applies Shore, Foulds and Gibbons' branch and bound algorithm.
  *
  * \param graph
@@ -228,7 +213,7 @@ double calcSolution(
 		copyTerminals.pushFront(v);
 	}
 	
-	AdjEdgeComparer comp(copyWeights);
+	EdgeComparer comp(copyWeights);
 	
 	return bnbInternal(
 	  copyGraph, 
