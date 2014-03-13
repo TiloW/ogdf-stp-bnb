@@ -24,16 +24,20 @@ using namespace std::chrono;
 class EdgeComparer
 {
 private:
-	EdgeArray<double> m_origWeights;
-	EdgeArray<edge> m_mapping;
+	const EdgeArray<double> *m_pOrigWeights;
+	const EdgeArray<edge> *m_pMapping;
 public:
-	EdgeComparer(const EdgeArray<edge> &mapping, const EdgeArray<double> &origWeights) : 
-	  m_origWeights(origWeights), 
-	  m_mapping(mapping) 
-	{}
+	EdgeComparer(const EdgeArray<edge> *mapping, const EdgeArray<double> *origWeights)
+	{
+		m_pMapping = mapping;
+		m_pOrigWeights = origWeights;
+	}
+
 	int compare(const edge &e, const edge &f) const {
 		// TODO: check for infinity?
-		return m_origWeights[m_mapping[e]] - m_origWeights[m_mapping[f]];
+		OGDF_ASSERT((*m_pMapping)[e] != NULL);
+		OGDF_ASSERT((*m_pMapping)[f] != NULL);
+		return (*m_pOrigWeights)[(*m_pMapping)[e]] - (*m_pOrigWeights)[(*m_pMapping)[f]];
 	}
 	OGDF_AUGMENT_COMPARER(edge)
 };
@@ -51,9 +55,9 @@ void printHelp()
 void writeSVG(const Graph &graph, const List<node> &terminals, const std::string &name)
 {
 	GraphAttributes attr(graph,
-	  GraphAttributes::edgeGraphics | 
-	  GraphAttributes::nodeGraphics | 
-	  GraphAttributes::nodeLabel | 
+	  GraphAttributes::edgeGraphics |
+	  GraphAttributes::nodeGraphics |
+	  GraphAttributes::nodeLabel |
 	  GraphAttributes::nodeStyle);
 
 	node v;
@@ -121,9 +125,11 @@ double bnbInternal(
   double prevCost = 0,
   int depth = 0)
 {
+/*
 	std::stringstream ss;
 	ss << "svg/" << depth << ".svg";
-	//writeSVG(graph, terminals, ss.str());
+	writeSVG(graph, terminals, ss.str());
+*/
 
 	for(int i = 0; i < depth; i++) cout << " ";
 	cout << terminals.size() << "  |  " << prevCost << endl;
@@ -176,7 +182,7 @@ double bnbInternal(
 		OGDF_ASSERT(branchingEdge == NULL || mapping[branchingEdge] != NULL);
 		OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 	
-		// branching edge has been found or there is no feasible solution	
+		// branching edge has been found or there is no feasible solution
 		if(branchingEdge != NULL && origWeights[mapping[branchingEdge]] < std::numeric_limits<double>::max()) {
 			// remove branching edge
 			graph.hideEdge(branchingEdge);
@@ -194,15 +200,20 @@ double bnbInternal(
 			OGDF_ASSERT(nodeToRemove != NULL);
 			OGDF_ASSERT(graph.searchEdge(targetNode, nodeToRemove) == NULL);
 			OGDF_ASSERT(graph.searchEdge(nodeToRemove, targetNode) == NULL);
-			graph.adjEdges(nodeToRemove, edges);	
+			graph.adjEdges(nodeToRemove, edges);
 			forall_listiterators(edge, it, edges) {
-				OGDF_ASSERT(branchingEdge != *it);	
+				OGDF_ASSERT(branchingEdge != *it);
 				OGDF_ASSERT((*it)->opposite(nodeToRemove) != targetNode);
 			}
+			for(int i = 0; i <= depth; i++) cout << " ";
+			cout << "found " << edges.size() << " edges that need to be moved" << endl;
 
 			List<edge> movedEdges;
-			edge e;
-			forall_adj_edges(e, nodeToRemove) {			
+			ListConstIterator<edge> itNext;
+			for(ListConstIterator<edge> it = edges.begin(); it.valid(); it = itNext) {
+				edge e = *it;
+				itNext = it.succ();
+
 				for(int i = 0; i <= depth; i++) cout << " ";
 				cout << "moving edge " << e << endl;
 	
@@ -364,7 +375,7 @@ double calcSolution(
 	node v;
 	forall_nodes(v, graph) {
 		node copiedNode = copiedGraph.newNode();
-		origNodes[copiedGraph.newNode()] = v;
+		origNodes[copiedNode] = v;
 		copiedNodes[v] = copiedNode;
 	}
 
@@ -380,7 +391,10 @@ double calcSolution(
 		copiedTerminals.pushFront(copiedNodes[*it]);
 	}
 	
-	EdgeComparer comp(origEdges, weights);
+	EdgeComparer comp(&origEdges, &weights);
+
+	writeSVG(graph, terminals, "original.svg");
+	writeSVG(copiedGraph, copiedTerminals, "copy.svg");
 
 	return bnbInternal(
 	  copiedGraph, 
