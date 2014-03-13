@@ -84,9 +84,10 @@ void writeSVG(const Graph &graph, const List<node> &terminals, const std::string
 
 edge moveTarget(Graph &graph, EdgeArray<edge> &mapping, edge e, node newTarget) {
 	edge origEdge = mapping[e];
+	node v = e->source();
 	graph.delEdge(e);
 	OGDF_ASSERT(origEdge != NULL);
-	edge f = graph.newEdge(e->source(), newTarget);
+	edge f = graph.newEdge(v, newTarget);
 	OGDF_ASSERT(f != NULL);
 	mapping[f] = origEdge;
 
@@ -95,9 +96,10 @@ edge moveTarget(Graph &graph, EdgeArray<edge> &mapping, edge e, node newTarget) 
 
 edge moveSource(Graph &graph, EdgeArray<edge> &mapping, edge e, node newSource) {
 	edge origEdge = mapping[e];
+	node v = e->target();
 	graph.delEdge(e);
 	OGDF_ASSERT(origEdge != NULL);
-	edge f = graph.newEdge(newSource, e->target());
+	edge f = graph.newEdge(newSource, v);
 	OGDF_ASSERT(f != NULL);
 	mapping[f] = origEdge;
 
@@ -125,11 +127,11 @@ double bnbInternal(
   double prevCost = 0,
   int depth = 0)
 {
-/*
+
 	std::stringstream ss;
 	ss << "svg/" << depth << ".svg";
 	writeSVG(graph, terminals, ss.str());
-*/
+//*/
 
 	for(int i = 0; i < depth; i++) cout << " ";
 	cout << terminals.size() << "  |  " << prevCost << endl;
