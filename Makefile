@@ -32,6 +32,8 @@ all: $(BINARIES)
 
 stp-solver: stp-solver.o
 
+move-test: move-test.o
+
 %o: %cc
 
 Makefile.config:
