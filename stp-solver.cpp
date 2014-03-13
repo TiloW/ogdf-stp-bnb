@@ -9,6 +9,12 @@
 #include <ogdf/basic/NodeArray.h>
 #include <ogdf/fileformats/GraphIO.h>
 
+// temporary includes
+#include <ogdf/energybased/FMMMLayout.h>
+#include <ogdf/basic/simple_graph_alg.h>
+#include <sstream>
+#include <string>
+
 using namespace ogdf;
 using namespace std::chrono;
 
@@ -38,6 +44,36 @@ void printHelp()
           "Solution and print the total cost." << endl;
 }
 
+void writeSVG(const Graph &graph, const List<node> &terminals, const std::string &name)
+{
+	GraphAttributes attr(graph,
+	  GraphAttributes::edgeGraphics | 
+	  GraphAttributes::nodeGraphics | 
+	  GraphAttributes::nodeLabel | 
+	  GraphAttributes::nodeStyle);
+
+	node v;
+	forall_nodes(v, graph) {
+		attr.width(v) = attr.height(v) = 20;
+		std::stringstream ss;
+		ss << v;
+		attr.label(v) = ss.str();
+		if(terminals.search(v).valid()) {
+			attr.fillColor(v) = Color::Red;
+		}
+
+	}
+
+	FMMMLayout layout;
+	layout.useHighLevelOptions(true);
+	layout.unitEdgeLength(40);
+	layout.newInitialPlacement(true);
+	layout.qualityVersusSpeed(FMMMLayout::qvsGorgeousAndEfficient);
+
+	layout.call(attr);
+	GraphIO::drawSVG(attr, name);
+}
+
 double bnbInternal(
   Graph &graph, 
   EdgeArray<double> &weights, 
@@ -45,10 +81,19 @@ double bnbInternal(
   Graph &tree, 
   double upperBound,
   EdgeComparer &comp,
-  double prevCost = 0)
+  double prevCost = 0,
+  int depth = 0)
 {
+	std::stringstream ss;
+	ss << "svg/" << depth << ".svg";
+	writeSVG(graph, terminals, ss.str());
+
+	for(int i = 0; i < depth; i++) cout << " ";
 	cout << terminals.size() << "  |  " << prevCost << endl;
 
+	OGDF_ASSERT(isLoopFree(graph));
+	OGDF_ASSERT(isParallelFreeUndirected(graph));
+	
 	// TODO: Construct tree	
 	double result = std::numeric_limits<double>::max();
 	// TODO: compare bounds
@@ -87,12 +132,16 @@ double bnbInternal(
 				break;
 			}
 		}
-		
+
+		OGDF_ASSERT(graph.consistencyCheck());
+		OGDF_ASSERT(isParallelFreeUndirected(graph));		
+	
 		// branching edge has been found or there is no feasible solution	
 		if(branchingEdge != NULL && weights[branchingEdge] < std::numeric_limits<double>::max()) {
 			// remove branching edge
 			graph.hideEdge(branchingEdge);
 
+			for(int i = 0; i < depth; i++) cout << " ";
 			cout << "branching edge " << branchingEdge << endl;
 
 			// first branch: Inclusion of the edge
@@ -100,18 +149,31 @@ double bnbInternal(
 			List<edge> edges, hiddenEdges;
 			node nodeToRemove = branchingEdge->source();
 			node targetNode = branchingEdge->target();
-		
-			graph.adjEdges(nodeToRemove, edges);
+	
+			OGDF_ASSERT(targetNode != NULL);
+			OGDF_ASSERT(nodeToRemove != NULL);
+			OGDF_ASSERT(graph.searchEdge(targetNode, nodeToRemove) == NULL);
+			OGDF_ASSERT(graph.searchEdge(nodeToRemove, targetNode) == NULL);
+			graph.adjEdges(nodeToRemove, edges);	
+			forall_listiterators(edge, it, edges) {
+				OGDF_ASSERT(branchingEdge != *it);	
+				OGDF_ASSERT((*it)->opposite(nodeToRemove) != targetNode);
+			}
+
 			forall_listiterators(edge, it, edges) {
 				edge e = *it;
+			
+				for(int i = 0; i <= depth; i++) cout << " ";
+				cout << "investigating edge " << e << endl;
+	
+				OGDF_ASSERT(e != branchingEdge);
+				OGDF_ASSERT(e->target() == nodeToRemove || e->source() == nodeToRemove);
+				OGDF_ASSERT(e->opposite(nodeToRemove) != targetNode);
 
-				if(e->target() != nodeToRemove) {
-					graph.reverseEdge(e);
-				}
-
-				edge f = graph.searchEdge(e->source(), targetNode);
+				node w = e->opposite(nodeToRemove);
+				edge f = graph.searchEdge(w, targetNode);
 				if(f == NULL) {
-					f = graph.searchEdge(targetNode, e->source());
+					f = graph.searchEdge(targetNode, w);
 				}
 				if(f != NULL) {
 					if(weights[f] < weights[e]) {
@@ -123,7 +185,16 @@ double bnbInternal(
 						graph.hideEdge(f);
 					}
 				}
-				graph.moveTarget(e, targetNode);
+				if(e->target() == nodeToRemove) {
+					OGDF_ASSERT(e->target() == nodeToRemove);
+					OGDF_ASSERT(e->source() != targetNode);
+					graph.moveTarget(e, targetNode);
+				}
+				else {
+					OGDF_ASSERT(e->source() == nodeToRemove)
+					OGDF_ASSERT(e->target() != targetNode)
+					graph.moveSource(e, targetNode);
+				}
 			}
 			// nodeToRemove is isolated at this point
 			// thus no need to actually remove it
@@ -142,7 +213,7 @@ double bnbInternal(
 			}
 
 			// calculate result on modified graph
-			result = bnbInternal(graph, weights, terminals, tree, upperBound, comp, weights[branchingEdge] + prevCost);
+			result = bnbInternal(graph, weights, terminals, tree, upperBound, comp, weights[branchingEdge] + prevCost, depth+1);
 			
 			// restore previous graph	
 			if(remNodeIsTerminal) {
@@ -153,7 +224,16 @@ double bnbInternal(
 			}
 		       
 			forall_listiterators(edge, it, edges) {
-				graph.moveTarget(*it, nodeToRemove);
+				edge e = *it;
+				OGDF_ASSERT(e->source() != nodeToRemove && e->target() != nodeToRemove);
+				
+				if(e->target() == targetNode) {
+					graph.moveTarget(e, nodeToRemove);
+				}
+				else {
+					OGDF_ASSERT(e->source() == targetNode);
+					graph.moveSource(e, nodeToRemove);
+				}
 			}
 
 			forall_listiterators(edge, it, hiddenEdges) {
@@ -161,7 +241,7 @@ double bnbInternal(
 			}
 
 			// sencond branch: Exclusion of the edge
-			double exEdgeResult = bnbInternal(graph, weights, terminals, tree, upperBound, comp, prevCost);
+			double exEdgeResult = bnbInternal(graph, weights, terminals, tree, upperBound, comp, prevCost, depth+1);
 
 			// decide which branch returned best result
 			if(exEdgeResult < result) {
