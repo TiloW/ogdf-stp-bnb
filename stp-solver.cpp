@@ -84,7 +84,7 @@ void writeSVG(const Graph &graph, const List<node> &terminals, const std::string
 
 edge moveTarget(Graph &graph, EdgeArray<edge> &mapping, edge e, node newTarget) {
 	OGDF_ASSERT(newTarget != e->target());
-	cout << "moveTarget: " << e;
+	//cout << "moveTarget: " << e;
 
 	edge origEdge = mapping[e];
 	node v = e->source();
@@ -94,14 +94,14 @@ edge moveTarget(Graph &graph, EdgeArray<edge> &mapping, edge e, node newTarget) 
 	OGDF_ASSERT(f != NULL);
 	mapping[f] = origEdge;
 
-	cout << " -> " << f << endl;
+	//cout << " -> " << f << endl;
 
 	return f;
 }
 
 edge moveSource(Graph &graph, EdgeArray<edge> &mapping, edge e, node newSource) {
 	OGDF_ASSERT(newSource != e->source());
-	cout << "moveSource: " << e;
+	//cout << "moveSource: " << e;
  
 	edge origEdge = mapping[e];
 	node v = e->target();
@@ -111,7 +111,7 @@ edge moveSource(Graph &graph, EdgeArray<edge> &mapping, edge e, node newSource) 
 	OGDF_ASSERT(f != NULL);
 	mapping[f] = origEdge;
 
-	cout << " -> " << f << endl;
+	//cout << " -> " << f << endl;
 
 	return f;
 }
@@ -137,11 +137,11 @@ double bnbInternal(
   double prevCost = 0,
   int depth = 0)
 {
-
+	/*
 	std::stringstream ss;
 	ss << "svg/" << depth << ".svg";
 	writeSVG(graph, terminals, ss.str());
-//*/
+
 
 	for(int i = 0; i < depth; i++) cout << " ";
 	cout << terminals.size() << "  |  " << prevCost << endl;
@@ -149,6 +149,7 @@ double bnbInternal(
 	OGDF_ASSERT(isLoopFree(graph));
 	OGDF_ASSERT(isParallelFreeUndirected(graph));
 	OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+	*/
 	
 	// TODO: Construct tree	
 	double result = std::numeric_limits<double>::max();
@@ -188,16 +189,16 @@ double bnbInternal(
 				break;
 			}
 		}
-
+		OGDF_ASSERT(branchingEdge == NULL || mapping[branchingEdge] != NULL);
+		/*
 		OGDF_ASSERT(graph.consistencyCheck());
 		OGDF_ASSERT(isParallelFreeUndirected(graph));		
-		OGDF_ASSERT(branchingEdge == NULL || mapping[branchingEdge] != NULL);
 		OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
-	
+		*/
 		// branching edge has been found or there is no feasible solution
 		if(branchingEdge != NULL && origWeights[mapping[branchingEdge]] < std::numeric_limits<double>::max()) {
-			for(int i = 0; i < depth; i++) cout << " ";
-			cout << "branching edge " << branchingEdge << endl;
+			//for(int i = 0; i < depth; i++) cout << " ";
+			//cout << "branching edge " << branchingEdge << endl;
 			
 			// remove branching edge
 			node nodeToRemove = branchingEdge->source();
@@ -211,15 +212,17 @@ double bnbInternal(
 			OGDF_ASSERT(nodeToRemove != NULL);
 			OGDF_ASSERT(graph.searchEdge(targetNode, nodeToRemove) == NULL);
 			OGDF_ASSERT(graph.searchEdge(nodeToRemove, targetNode) == NULL);
+			
 			List<edge> edges;
 			graph.adjEdges(nodeToRemove, edges);
+			/*
 			forall_listiterators(edge, it, edges) {
 				OGDF_ASSERT(branchingEdge != *it);
 				OGDF_ASSERT((*it)->opposite(nodeToRemove) != targetNode);
 			}
 			for(int i = 0; i <= depth; i++) cout << " ";
 			cout << "found " << edges.size() << " edges that need to be moved" << endl;
-
+			*/
 			List<node> delEdges, movedEdges;
 			List<edge> origDelEdges, origMovedEdges;
 			ListConstIterator<edge> itNext;
@@ -227,8 +230,8 @@ double bnbInternal(
 				edge e = *it;
 				itNext = it.succ();
 
-				for(int i = 0; i <= depth; i++) cout << " ";
-				cout << "checking edge " << e << endl;
+				//for(int i = 0; i <= depth; i++) cout << " ";
+				//cout << "checking edge " << e << endl;
 	
 				OGDF_ASSERT(e != branchingEdge);
 				OGDF_ASSERT(e->target() == nodeToRemove || e->source() == nodeToRemove);
@@ -241,14 +244,14 @@ double bnbInternal(
 				}
 				bool deletedEdgeE = false;
 				if(f != NULL) {
-					for(int i = 0; i <= depth; i++) cout << " ";
-					cout << "> found conflicting edge: " << f << ".. deleting edge with higher weight" << endl;
+					//for(int i = 0; i <= depth; i++) cout << " ";
+					//cout << "> found conflicting edge: " << f << ".. deleting edge with higher weight" << endl;
 					if(origWeights[mapping[f]] < origWeights[mapping[e]]) {
 						delEdges.pushFront(e->target());
 						delEdges.pushFront(e->source());
 						origDelEdges.pushFront(mapping[e]);
 						graph.delEdge(e);
-						OGDF_ASSERT(graph.consistencyCheck());
+						//OGDF_ASSERT(graph.consistencyCheck());
 
 						deletedEdgeE = true;
 					}
@@ -257,29 +260,28 @@ double bnbInternal(
 						delEdges.pushFront(f->source());
 						origDelEdges.pushFront(mapping[f]);
 						graph.delEdge(f);
-						OGDF_ASSERT(graph.consistencyCheck());
+						//OGDF_ASSERT(graph.consistencyCheck());
 					}
 				}
 				if(!deletedEdgeE) {
-					for(int i = 0; i <= depth; i++) cout << " ";
-					cout << "> edge " << e << " was not deleted and will thus be moved" << endl;
+					//for(int i = 0; i <= depth; i++) cout << " ";
+					//cout << "> edge " << e << " was not deleted and will thus be moved" << endl;
 					
 					origMovedEdges.pushFront(mapping[e]);
 					if(e->target() == nodeToRemove) {
-						OGDF_ASSERT(e->target() == nodeToRemove);
 						OGDF_ASSERT(e->source() != targetNode);
 						movedEdges.pushFront(e->source());
 						moveTarget(graph, mapping, e, targetNode);
-						OGDF_ASSERT(graph.consistencyCheck());
-						OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+						//OGDF_ASSERT(graph.consistencyCheck());
+						//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 					}
 					else {
 						OGDF_ASSERT(e->source() == nodeToRemove)
 						OGDF_ASSERT(e->target() != targetNode)
 						movedEdges.pushFront(e->target());
 						moveSource(graph, mapping, e, targetNode);
-						OGDF_ASSERT(graph.consistencyCheck());
-						OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+						//OGDF_ASSERT(graph.consistencyCheck());
+						//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 					}
 				}
 			}
@@ -313,6 +315,11 @@ double bnbInternal(
 			  depth+1);
 			OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 			
+			// update upper bound according to inclusion branch
+			if(result < upperBound) {
+				upperBound = result;
+			}
+			
 			// restore previous graph	
 			if(remNodeIsTerminal) {
 				terminals.pushFront(nodeToRemove);
@@ -332,19 +339,21 @@ double bnbInternal(
 				OGDF_ASSERT(e != NULL);
 				OGDF_ASSERT(e->opposite(targetNode) != nodeToRemove);
 	
-				OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
-				edge f;
-				cout << v << endl;
+				//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+				//edge f;
+				//cout << v << endl;
 				if(e->source() == v) {
-					f = moveTarget(graph, mapping, e, nodeToRemove);
-					OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+					//f = 
+					moveTarget(graph, mapping, e, nodeToRemove);
+					//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 				}
 				else {
-					f = moveSource(graph, mapping, e, nodeToRemove);
-					OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+					//f = 
+					moveSource(graph, mapping, e, nodeToRemove);
+					//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 				}
-				for(int i = 0; i <= depth; i++) cout << " ";
-				cout << "moved edge " << f << " to former position" << endl;
+				//for(int i = 0; i <= depth; i++) cout << " ";
+				//cout << "moved edge " << f << " to former position" << endl;
 			}
 
 			// restored deleted edges
@@ -354,11 +363,11 @@ double bnbInternal(
 				edge e = graph.newEdge(source, target);
 				OGDF_ASSERT(!origDelEdges.empty());
 				mapping[e] = origDelEdges.popFrontRet();
-				for(int i = 0; i <= depth; i++) cout << " ";
-				cout << "restored formerly deleted edge " << e << endl;
+				//for(int i = 0; i <= depth; i++) cout << " ";
+				//cout << "restored formerly deleted edge " << e << endl;
 			}
 			OGDF_ASSERT(origDelEdges.empty());
-			OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+			//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 			
 			// sencond branch: Exclusion of the edge
 			double exEdgeResult = bnbInternal(
@@ -367,7 +376,7 @@ double bnbInternal(
 			  origWeights, 
 			  terminals, 
 			  tree, 
-			  upperBound, 
+			  upperBound,
 			  comp, 
 			  prevCost, 
 			  depth+1);
@@ -380,10 +389,13 @@ double bnbInternal(
 			// finally: restore the branching edge
 			edge f = graph.newEdge(nodeToRemove, targetNode);
 			mapping[f] = origBranchingEdge;
-			OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+			//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 		}
 	}
-	OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+	//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+	if(result < std::numeric_limits<double>::max()) {
+		cout << upperBound << " | " << result << endl;
+	}
 	return result;
 }
 
