@@ -9,6 +9,8 @@
 #include <ogdf/basic/NodeArray.h>
 #include <ogdf/fileformats/GraphIO.h>
 
+#define MAX_WEIGHT std::numeric_limits<double>::max()
+
 // temporary includes
 #include <ogdf/energybased/FMMMLayout.h>
 #include <ogdf/basic/simple_graph_alg.h>
@@ -20,7 +22,7 @@ using namespace std::chrono;
 
 /**
  * Used for comparing edges by their respective weight.
- */
+ *
 class EdgeComparer
 {
 private:
@@ -41,6 +43,7 @@ public:
 	}
 	OGDF_AUGMENT_COMPARER(edge)
 };
+*/
 
 /**
  * Outputs a text describing how to use this program.
@@ -69,7 +72,6 @@ void writeSVG(const Graph &graph, const List<node> &terminals, const std::string
 		if(terminals.search(v).valid()) {
 			attr.fillColor(v) = Color::Red;
 		}
-
 	}
 
 	FMMMLayout layout;
@@ -99,11 +101,10 @@ double bnbInternal(
   List<node> &terminals,
   Graph &tree, 
   double upperBound,
-  const EdgeComparer &comp,
   double prevCost = 0,
   int depth = 0)
 {
-	double result = std::numeric_limits<double>::max();
+	double result = MAX_WEIGHT;
 	
 	// TODO: compare bounds
 	if(prevCost < upperBound) {
@@ -126,34 +127,47 @@ double bnbInternal(
 			// all terminals are connected
 			result = prevCost;
 		} 
-		else {	
+		else { 	
 			edge branchingEdge = NULL;
-			double maxPenalty = 0;
+			double maxPenalty = -1;
 
 			// calculate penalties for nodes
-			forall_listiterators(node, it, terminals) {
-				List<edge> edges;
-				graph.adjEdges(*it, edges);
-				if(edges.size() > 0) {
-					edges.quicksort(comp);
-					edge e1 = *(edges.get(0));
-					
-					if(edges.size() > 1) {
-						edge e2 = *(edges.get(1));
+			bool continueSearch = true;
+			for(ListConstIterator<node> it = terminals.begin(); continueSearch && it.valid(); ++it) {
+				double minWeight = MAX_WEIGHT,
+				       secondMinWeight = MAX_WEIGHT;
+				edge minEdge = NULL;
 
-						double tmp = origWeights[mapping[e2]] - origWeights[mapping[e1]];
-						if(tmp >= maxPenalty) {
-							maxPenalty = tmp;
-							branchingEdge = e1;
-						}
-					} else {
-						if(!edges.empty()) {
-							branchingEdge = e1;
-						}
-						break;
+				// investigate all edges of each terminal
+				List<edge> adjEdges;
+				graph.adjEdges(*it, adjEdges);
+				for(ListConstIterator<edge> itEdge = adjEdges.begin(); continueSearch && itEdge.valid(); ++itEdge) {
+					edge e = *itEdge;
+					if(origWeights[mapping[e]] < minWeight) {
+						secondMinWeight = minWeight;
+						minWeight = origWeights[mapping[e]];
+						minEdge = e;
 					}
+					else {
+						if(origWeights[mapping[e]] < secondMinWeight) {
+							secondMinWeight = origWeights[mapping[e]];
+						}
+					}
+				}
+
+				// is terminal isolated or has only one edge?
+				// if so we can break here
+				if(minWeight == MAX_WEIGHT || 
+				   secondMinWeight == MAX_WEIGHT) {
+					branchingEdge = minEdge;
+					continueSearch = false;
 				} else {
-					break;
+					// update branching edge if need be
+					double penalty = secondMinWeight - minWeight;
+					if(penalty > maxPenalty) {
+						maxPenalty = penalty;
+						branchingEdge = minEdge;
+					}
 				}
 			}
 			OGDF_ASSERT(branchingEdge == NULL || mapping[branchingEdge] != NULL);
@@ -163,7 +177,7 @@ double bnbInternal(
 			OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 			*/
 			// branching edge has been found or there is no feasible solution
-			if(branchingEdge != NULL && origWeights[mapping[branchingEdge]] < std::numeric_limits<double>::max()) {
+			if(branchingEdge != NULL && origWeights[mapping[branchingEdge]] < MAX_WEIGHT) {
 				//for(int i = 0; i < depth; i++) cout << " ";
 				//cout << "branching edge " << branchingEdge << endl;
 				
@@ -280,7 +294,6 @@ double bnbInternal(
 				  terminals, 
 				  tree, 
 				  upperBound, 
-				  comp, 
 				  origWeights[mapping[branchingEdge]] + prevCost, 
 				  depth+1);
 				OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
@@ -348,7 +361,6 @@ double bnbInternal(
 				  terminals, 
 				  tree, 
 				  upperBound,
-				  comp, 
 				  prevCost, 
 				  depth+1);
 
@@ -392,8 +404,7 @@ double bnbInternal(
 double calcSolution(
   const Graph &graph, 
   const EdgeArray<double> &weights, 
-  const List<node> &terminals, 
-//  const NodeArray<bool> &isTerminal, 
+  const List<node> &terminals,  
   Graph &tree)
 {
 	tree.clear();
@@ -423,7 +434,7 @@ double calcSolution(
 		copiedTerminals.pushFront(copiedNodes[*it]);
 	}
 	
-	EdgeComparer comp(&origEdges, &weights);
+	//EdgeComparer comp(&origEdges, &weights);
 
 	//writeSVG(graph, terminals, "original.svg");
 	//writeSVG(copiedGraph, copiedTerminals, "copy.svg");
@@ -433,9 +444,8 @@ double calcSolution(
 	  origEdges,
 	  weights, 
 	  copiedTerminals, 
-	  tree, 
-	  std::numeric_limits<double>::max(), 
-	  comp); 
+	  tree,
+	  MAX_WEIGHT); 
 }
 
 /**
