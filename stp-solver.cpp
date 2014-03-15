@@ -301,7 +301,6 @@ double bnbInternal(
 				// update upper bound according to inclusion branch
 				if(result < upperBound) {
 					upperBound = result;
-					cout << result << endl;
 				}
 				
 				// restore previous graph	
@@ -367,9 +366,6 @@ double bnbInternal(
 				// decide which branch returned best result
 				if(exEdgeResult < result) {
 					result = exEdgeResult;
-					if(result < upperBound) {
-						cout << result << endl;
-					}
 				}
 
 				// finally: restore the branching edge
