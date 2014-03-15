@@ -150,6 +150,7 @@ double bnbInternal(
 			bool continueSearch = true;
 			double sumOfMinWeights = 0; // b
 			double sumOfMinTermWeights = 0; // c
+			double absoluteMinTermWeight = MAX_WEIGHT;
 			for(ListConstIterator<node> it = terminals.begin(); continueSearch && it.valid(); ++it) {
 				double minTermWeight = MAX_WEIGHT,
 				       minWeight = MAX_WEIGHT,
@@ -157,6 +158,7 @@ double bnbInternal(
 				edge minEdge = NULL;
 
 				// investigate all edges of each terminal
+				// calculate lower boundary and find branching edge
 				List<edge> adjEdges;
 				graph.adjEdges(*it, adjEdges);
 				for(ListConstIterator<edge> itEdge = adjEdges.begin(); continueSearch && itEdge.valid(); ++itEdge) {
@@ -171,7 +173,22 @@ double bnbInternal(
 							secondMinWeight = origWeights[mapping[e]];
 						}
 					}
+					
+					if(isTerminal[e->opposite(*it)] && origWeights[mapping[e]] < minTermWeight) {
+						minTermWeight = origWeights[mapping[e]];
+						if(minTermWeight < absoluteMinTermWeight) {
+							absoluteMinTermWeight = minTermWeight;
+						}
+					}
 				}
+
+				if(sumOfMinTermWeights < MAX_WEIGHT && minTermWeight < MAX_WEIGHT) {
+					sumOfMinTermWeights += minTermWeight;
+				}
+				else {
+					sumOfMinTermWeights = MAX_WEIGHT;
+				}
+				OGDF_ASSERT(absoluteMinTermWeight <= sumOfMinTermWeights);
 
 				// is terminal isolated or has only one edge?
 				// if so we can break here
@@ -191,9 +208,14 @@ double bnbInternal(
 			}
 
 			// compare bounds for this graph
-			double maxCost = upperBound - prevCost;
-			if(maxCost <= sumOfMinWeights && maxCost <= sumOfMinTermWeights) {
-				//branchingEdge = NULL;
+			if(branchingEdge != NULL) {
+				double maxCost = upperBound - prevCost;
+				if(sumOfMinTermWeights < MAX_WEIGHT) {
+					sumOfMinTermWeights -= absoluteMinTermWeight;
+				}
+				if(maxCost <= sumOfMinWeights && maxCost <= sumOfMinTermWeights) {
+					branchingEdge = NULL;
+				}
 			}
 
 			OGDF_ASSERT(branchingEdge == NULL || mapping[branchingEdge] != NULL);
