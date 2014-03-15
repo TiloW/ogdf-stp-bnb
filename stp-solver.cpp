@@ -81,7 +81,8 @@ bool validateMapping(const Graph &graph, const EdgeArray<edge> &mapping, const E
 
 /**
  * Calculates the optimal Steinter tree recursivly.
- * Each edge is either included or excluded, which gives rise to two new branches in each step.
+ * Should not be called directly but by calcSolution.
+ * Each edge is either included or excluded, which gives rise to up to two new branches in each step.
  * 
  * \param graph
  *	the graph to be examined, though not const, no node will be modified
@@ -92,6 +93,8 @@ bool validateMapping(const Graph &graph, const EdgeArray<edge> &mapping, const E
  *	the weight of the original edges
  * \param terminals
  *	a list of terminals, the recursion will stop when the number of terminals reaches one.
+ * \param isTerminal
+ *	maps nodes to whether they are a terminal or not
  * \param tree
  *	the resulting Steinertree with edges in the original graph, not yet implemented
  * \param upperBound
@@ -111,6 +114,7 @@ double bnbInternal(
   EdgeArray<edge> &mapping,
   const EdgeArray<double> &origWeights,
   List<node> &terminals,
+  NodeArray<bool> &isTerminal,
   Graph &tree, 
   double upperBound,
   double prevCost = 0,
@@ -118,7 +122,6 @@ double bnbInternal(
 {
 	double result = MAX_WEIGHT;
 	
-	// TODO: compare bounds
 	if(prevCost < upperBound) {
 		/*
 		std::stringstream ss;
@@ -145,8 +148,11 @@ double bnbInternal(
 
 			// calculate penalties for nodes
 			bool continueSearch = true;
+			double sumOfMinWeights = 0; // b
+			double sumOfMinTermWeights = 0; // c
 			for(ListConstIterator<node> it = terminals.begin(); continueSearch && it.valid(); ++it) {
-				double minWeight = MAX_WEIGHT,
+				double minTermWeight = MAX_WEIGHT,
+				       minWeight = MAX_WEIGHT,
 				       secondMinWeight = MAX_WEIGHT;
 				edge minEdge = NULL;
 
@@ -174,6 +180,7 @@ double bnbInternal(
 					branchingEdge = minEdge;
 					continueSearch = false;
 				} else {
+					sumOfMinWeights += minWeight;
 					// update branching edge if need be
 					double penalty = secondMinWeight - minWeight;
 					if(penalty > maxPenalty) {
@@ -182,6 +189,13 @@ double bnbInternal(
 					}
 				}
 			}
+
+			// compare bounds for this graph
+			double maxCost = upperBound - prevCost;
+			if(maxCost <= sumOfMinWeights && maxCost <= sumOfMinTermWeights) {
+				//branchingEdge = NULL;
+			}
+
 			OGDF_ASSERT(branchingEdge == NULL || mapping[branchingEdge] != NULL);
 			/*
 			OGDF_ASSERT(graph.consistencyCheck());
@@ -285,16 +299,16 @@ double bnbInternal(
 				// thus no need to actually remove it
 				// (easier to keep track of CopyGraph mapping)
 				
-				// remove node from terminals tooo
-				ListIterator<node> it  = terminals.search(nodeToRemove),
-						   it2 = terminals.search(targetNode);
-				bool remNodeIsTerminal = it.valid();
+				// remove node from terminals too
+				bool remNodeIsTerminal = isTerminal[nodeToRemove],
+                                     targetNodeIsTerminal = isTerminal[targetNode];
 				if(remNodeIsTerminal) {
-					terminals.del(it);
+					terminals.del(terminals.search(nodeToRemove));
+					isTerminal[nodeToRemove] = false;
 				}
-				bool targetNodeIsTerminal = it2.valid();
 				if(!targetNodeIsTerminal) {
 					terminals.pushFront(targetNode);
+					isTerminal[targetNode] = true;
 				}
 
 				// calculate result on modified graph
@@ -304,6 +318,7 @@ double bnbInternal(
 				  mapping,
 				  origWeights, 
 				  terminals, 
+				  isTerminal,
 				  tree, 
 				  upperBound, 
 				  origWeights[mapping[branchingEdge]] + prevCost, 
@@ -318,9 +333,11 @@ double bnbInternal(
 				// restore previous graph	
 				if(remNodeIsTerminal) {
 					terminals.pushFront(nodeToRemove);
+					isTerminal[nodeToRemove] = true;
 				}
 				if(!targetNodeIsTerminal) {
 					terminals.del(terminals.search(targetNode));
+					isTerminal[targetNode] = false;
 				}
 			      
 				// restore moved edges 
@@ -370,6 +387,7 @@ double bnbInternal(
 				  mapping, 
 				  origWeights, 
 				  terminals, 
+				  isTerminal,
 				  tree, 
 				  upperBound,
 				  prevCost, 
@@ -412,7 +430,7 @@ double bnbInternal(
 double calcSolution(
   const Graph &graph, 
   const EdgeArray<double> &weights, 
-  const List<node> &terminals,  
+  const List<node> &terminals,
   Graph &tree)
 {
 	tree.clear();
@@ -422,6 +440,7 @@ double calcSolution(
 	NodeArray<node> copiedNodes(graph);
 	EdgeArray<edge> origEdges(copiedGraph);
 	List<node> copiedTerminals;
+	NodeArray<bool> isTerminal(copiedGraph, false);
 
 	node v;
 	forall_nodes(v, graph) {
@@ -440,6 +459,7 @@ double calcSolution(
 
 	forall_listiterators(node, it, terminals) {
 		copiedTerminals.pushFront(copiedNodes[*it]);
+		isTerminal[copiedNodes[*it]] = true;
 	}
 	
 	//EdgeComparer comp(&origEdges, &weights);
@@ -452,6 +472,7 @@ double calcSolution(
 	  origEdges,
 	  weights, 
 	  copiedTerminals, 
+	  isTerminal,
 	  tree,
 	  MAX_WEIGHT); 
 }
