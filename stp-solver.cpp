@@ -255,7 +255,7 @@ double bnbInternal(
 				cout << "found " << edges.size() << " edges that need to be moved" << endl;
 				*/
 				List<node> delEdges, movedEdges;
-				List<edge> origDelEdges, origMovedEdges;
+				List<edge> origDelEdges;
 				ListConstIterator<edge> itNext;
 				for(ListConstIterator<edge> it = edges.begin(); it.valid(); it = itNext) {
 					edge e = *it;
@@ -300,7 +300,6 @@ double bnbInternal(
 						//for(int i = 0; i <= depth; i++) cout << " ";
 						//cout << "> edge " << e << " was not deleted and will thus be moved" << endl;
 						
-						origMovedEdges.pushFront(mapping[e]);
 						if(e->target() == nodeToRemove) {
 							OGDF_ASSERT(e->source() != targetNode);
 							movedEdges.pushFront(e->source());
@@ -364,8 +363,8 @@ double bnbInternal(
 				}
 			      
 				// restore moved edges 
-				forall_listiterators(node, it, movedEdges) {
-					node v = *it;
+				while(!movedEdges.empty()) {
+					node v = movedEdges.popFrontRet();
 
 					edge e = graph.searchEdge(v, targetNode);
 					if(e == NULL) {
