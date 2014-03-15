@@ -147,11 +147,10 @@ double bnbInternal(
 			double maxPenalty = -1;
 
 			// calculate penalties for nodes
-			bool continueSearch = true;
 			double sumOfMinWeights = 0; // b
 			double sumOfMinTermWeights = 0; // c
 			double absoluteMinTermWeight = MAX_WEIGHT;
-			for(ListConstIterator<node> it = terminals.begin(); continueSearch && it.valid(); ++it) {
+			for(ListConstIterator<node> it = terminals.begin(); sumOfMinWeights < MAX_WEIGHT && it.valid(); ++it) {
 				double minTermWeight = MAX_WEIGHT,
 				       minWeight = MAX_WEIGHT,
 				       secondMinWeight = MAX_WEIGHT;
@@ -161,7 +160,7 @@ double bnbInternal(
 				// calculate lower boundary and find branching edge
 				List<edge> adjEdges;
 				graph.adjEdges(*it, adjEdges);
-				for(ListConstIterator<edge> itEdge = adjEdges.begin(); continueSearch && itEdge.valid(); ++itEdge) {
+				for(ListConstIterator<edge> itEdge = adjEdges.begin(); itEdge.valid(); ++itEdge) {
 					edge e = *itEdge;
 					if(origWeights[mapping[e]] < minWeight) {
 						secondMinWeight = minWeight;
@@ -195,7 +194,9 @@ double bnbInternal(
 				if(minWeight == MAX_WEIGHT || 
 				   secondMinWeight == MAX_WEIGHT) {
 					branchingEdge = minEdge;
-					continueSearch = false;
+					if(minWeight == MAX_WEIGHT) {
+						sumOfMinWeights = MAX_WEIGHT;
+					}
 				} else {
 					sumOfMinWeights += minWeight;
 					// update branching edge if need be
