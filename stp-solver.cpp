@@ -21,32 +21,7 @@ using namespace ogdf;
 using namespace std::chrono;
 
 /**
- * Used for comparing edges by their respective weight.
- *
-class EdgeComparer
-{
-private:
-	const EdgeArray<double> *m_pOrigWeights;
-	const EdgeArray<edge> *m_pMapping;
-public:
-	EdgeComparer(const EdgeArray<edge> *mapping, const EdgeArray<double> *origWeights)
-	{
-		m_pMapping = mapping;
-		m_pOrigWeights = origWeights;
-	}
-
-	int compare(const edge &e, const edge &f) const {
-		// TODO: check for infinity?
-		OGDF_ASSERT((*m_pMapping)[e] != NULL);
-		OGDF_ASSERT((*m_pMapping)[f] != NULL);
-		return (*m_pOrigWeights)[(*m_pMapping)[e]] - (*m_pOrigWeights)[(*m_pMapping)[f]];
-	}
-	OGDF_AUGMENT_COMPARER(edge)
-};
-*/
-
-/**
- * Outputs a text describing how to use this program.
+ * Prints a simple text describing how to use this program.
  */
 void printHelp()
 {
@@ -55,6 +30,11 @@ void printHelp()
           "Solution and print the total cost." << endl;
 }
 
+/**
+ * Prints the given Steiner tree problem.
+ *
+ * Only used for debugging.
+ */
 void writeSVG(const Graph &graph, const List<node> &terminals, const std::string &name)
 {
 	GraphAttributes attr(graph,
@@ -84,6 +64,11 @@ void writeSVG(const Graph &graph, const List<node> &terminals, const std::string
 	GraphIO::drawSVG(attr, name);
 }
 
+/**
+ * Used to validate the current mapping of edges to orignal edges
+ *
+ * Only used for debugging.
+ */
 bool validateMapping(const Graph &graph, const EdgeArray<edge> &mapping, const EdgeArray<double> &weights)
 {
 	edge e;
@@ -94,6 +79,33 @@ bool validateMapping(const Graph &graph, const EdgeArray<edge> &mapping, const E
 	return  true;
 }
 
+/**
+ * Calculates the optimal Steinter tree recursivly.
+ * Each edge is either included or excluded, which gives rise to two new branches in each step.
+ * 
+ * \param graph
+ *	the graph to be examined, though not const, no node will be modified
+ *	edges may be replaced in the process while the resulting graph will be similiar to the input
+ * \param mapping
+ *	maps each edge of the graph to an edge with weight stored in origWeights
+ * \param origWeights
+ *	the weight of the original edges
+ * \param terminals
+ *	a list of terminals, the recursion will stop when the number of terminals reaches one.
+ * \param tree
+ *	the resulting Steinertree with edges in the original graph, not yet implemented
+ * \param upperBound
+ *	the currently best known upper bound for an optimal solution
+ * \param prevCost
+ *	the cost accumulated in previous recursion steps (previously included edges)
+ * \param depth
+ *	the number of recursive descents, only used for debugging
+ * 
+ * \return
+ *	the total weight of the optimal solution (including prevCost)
+ *	note: This might be higher then the actual solution if no solution
+ *	satisfying the upper bound can be found.
+ */
 double bnbInternal(
   Graph &graph, 
   EdgeArray<edge> &mapping,
