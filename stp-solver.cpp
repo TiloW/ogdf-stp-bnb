@@ -82,42 +82,6 @@ void writeSVG(const Graph &graph, const List<node> &terminals, const std::string
 	GraphIO::drawSVG(attr, name);
 }
 
-edge moveTarget(Graph &graph, EdgeArray<edge> &mapping, edge e, node newTarget) {
-	OGDF_ASSERT(newTarget != e->target());
-	//cout << "moveTarget: " << e;
-
-	edge origEdge = mapping[e];
-	node v = e->source();
-	graph.delEdge(e);
-	e->~EdgeElement();
-	OGDF_ASSERT(origEdge != NULL);
-	edge f = graph.newEdge(v, newTarget);
-	OGDF_ASSERT(f != NULL);
-	mapping[f] = origEdge;
-
-	//cout << " -> " << f << endl;
-
-	return f;
-}
-
-edge moveSource(Graph &graph, EdgeArray<edge> &mapping, edge e, node newSource) {
-	OGDF_ASSERT(newSource != e->source());
-	//cout << "moveSource: " << e;
- 
-	edge origEdge = mapping[e];
-	node v = e->target();
-	graph.delEdge(e);
-	e->~EdgeElement();
-	OGDF_ASSERT(origEdge != NULL);
-	edge f = graph.newEdge(newSource, v);
-	OGDF_ASSERT(f != NULL);
-	mapping[f] = origEdge;
-
-	//cout << " -> " << f << endl;
-
-	return f;
-}
-
 bool validateMapping(const Graph &graph, const EdgeArray<edge> &mapping, const EdgeArray<double> &weights)
 {
 	edge e;
@@ -277,7 +241,7 @@ double bnbInternal(
 						if(e->target() == nodeToRemove) {
 							OGDF_ASSERT(e->source() != targetNode);
 							movedEdges.pushFront(e->source());
-							moveTarget(graph, mapping, e, targetNode);
+							graph.moveTarget(e, targetNode);
 							//OGDF_ASSERT(graph.consistencyCheck());
 							//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 						}
@@ -285,7 +249,7 @@ double bnbInternal(
 							OGDF_ASSERT(e->source() == nodeToRemove)
 							OGDF_ASSERT(e->target() != targetNode)
 							movedEdges.pushFront(e->target());
-							moveSource(graph, mapping, e, targetNode);
+							graph.moveSource(e, targetNode);
 							//OGDF_ASSERT(graph.consistencyCheck());
 							//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 						}
@@ -351,12 +315,12 @@ double bnbInternal(
 					//cout << v << endl;
 					if(e->source() == v) {
 						//f = 
-						moveTarget(graph, mapping, e, nodeToRemove);
+						graph.moveTarget(e, nodeToRemove);
 						//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 					}
 					else {
 						//f = 
-						moveSource(graph, mapping, e, nodeToRemove);
+						graph.moveSource(e, nodeToRemove);
 						//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 					}
 					//for(int i = 0; i <= depth; i++) cout << " ";
