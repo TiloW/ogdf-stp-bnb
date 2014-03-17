@@ -1,10 +1,10 @@
-#data/example.stp	5
-#data/B/b01.stp		82
-#data/B/b02.stp		83
-#data/B/b03.stp		138
-#data/B/b04.stp		59
-#data/B/b05.stp		61
-#data/B/b06.stp		122
+data/example.stp	5
+data/B/b01.stp		82
+data/B/b02.stp		83
+data/B/b03.stp		138
+data/B/b04.stp		59
+data/B/b05.stp		61
+data/B/b06.stp		122
 data/B/b07.stp		111
 data/B/b08.stp		104
 data/B/b09.stp		220
