@@ -22,21 +22,21 @@ endif
 LDFLAGS = -pthread -lm -L$(OGDF_LIBRARY_DIR)
 LDLIBS = -lOGDF -lCOIN
 
-BINARIES = stp-solver
-OBJS = 
+BINARIES = main
+OBJS = main.o STPSolver.o
 
-run: stp-solver
-	./stp-solver data/example.stp
+run: main
+	./main data/example.stp
 
-run-ext: stp-solver
-	./stp-solver data/B/b01.stp
+run-ext: main
+	./main data/B/b01.stp
 
 bench:
-	ruby bench.rb stp-solver
+	ruby bench.rb main
 
 all: $(BINARIES)
 
-stp-solver: stp-solver.o
+main: main.o STPSolver.o
 
 %o: %cc
 
