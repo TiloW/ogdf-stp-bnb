@@ -12,6 +12,8 @@ STPSolver::STPSolver(
 	m_graph = Graph();
 	m_mapping.init(m_graph);
 	m_isTerminal.init(m_graph, NULL);
+	int nodeCount = m_originalGraph.numberOfNodes();
+	m_edges = Array2D<edge>(0, nodeCount, 0, nodeCount, NULL);
 	
 	NodeArray<node> copiedNodes(m_originalGraph);
 
@@ -23,10 +25,10 @@ STPSolver::STPSolver(
 
 	edge e;
 	forall_edges(e, m_originalGraph) {
-		m_mapping[m_graph.newEdge(
-		  copiedNodes[e->source()],
-		  copiedNodes[e->target()]
-		)] = e;
+		node source = copiedNodes[e->source()],
+		     target = copiedNodes[e->target()];
+		
+		newEdge(source, target, e);
 	}
 
 	forall_listiterators(node, it, m_originalTerminals) {
@@ -87,11 +89,24 @@ bool STPSolver::validateMapping() const
 	return true;
 }
 
+edge STPSolver::lookupEdge(const node u, const node v) const
+{
+	return m_edges(u->index(), v->index());
+}
+
+void STPSolver::setEdgeLookup(const node u, const node v, const edge e)
+{
+	m_edges(u->index(), v->index()) = 
+	  m_edges(v->index(), u->index()) = e;
+}
+
 edge STPSolver::deleteEdge(edge e)
 {
 	edge result = m_mapping[e];
+	setEdgeLookup(e->source(), e->target(), NULL);
 	m_graph.delEdge(e);
 	e->~EdgeElement();
+	
 	return result;
 }
 
@@ -99,16 +114,24 @@ edge STPSolver::newEdge(node source, node target, edge e)
 {
 	edge result = m_graph.newEdge(source, target);
 	m_mapping[result] = e;
+	setEdgeLookup(source, target, result);
+
 	return result;
 }
 
 void STPSolver::moveSource(edge e, node v)
 {
+	OGDF_ASSERT(e != NULL);
+	setEdgeLookup(e->source(), e->target(), NULL);
+	setEdgeLookup(v, e->target(), e);
 	m_graph.moveSource(e, v);
 }
 
 void STPSolver::moveTarget(edge e, node v)
 {
+	OGDF_ASSERT(e != NULL);
+	setEdgeLookup(e->source(), e->target(), NULL);
+	setEdgeLookup(e->source(), v, e);
 	m_graph.moveTarget(e, v);
 }
 
@@ -262,13 +285,9 @@ double STPSolver::bnbInternal(double prevCost)
 
 					OGDF_ASSERT(e != branchingEdge);
 					OGDF_ASSERT(e->target() == nodeToRemove || e->source() == nodeToRemove);
-					OGDF_ASSERT(e->opposite(nodeToRemove) != targetNode);
+					OGDF_ASSERT(adj->twinNode() != targetNode);
 
-					node w = e->opposite(nodeToRemove);
-					edge f = m_graph.searchEdge(w, targetNode);
-					if(f == NULL) {
-						f = m_graph.searchEdge(targetNode, w);
-					}
+					edge f = lookupEdge(targetNode, adj->twinNode());
 					bool deletedEdgeE = false;
 					if(f != NULL) {
 						if(weightOf(f) < weightOf(e)) {
