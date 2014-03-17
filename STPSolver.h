@@ -27,7 +27,7 @@ private:
 	NodeArray<bool> m_isTerminal;
 	EdgeArray<edge> m_mapping;
 	
-    double m_upperBound;
+    	double m_upperBound;
 
 	/**
 	 * Prints the given Steiner tree problem.
@@ -36,7 +36,7 @@ private:
 	 * \param filename
 	 * 	the name of the SVG file to be created
 	 */
-	void writeSVG(const std::string &filename);
+	void writeSVG(const std::string &filename) const;
 
 	/**
 	 * Used to validate the current mapping of edges to orignal edges
@@ -46,8 +46,18 @@ private:
 	 * \return
 	 * 	always returns true
 	 */
-	bool validateMapping();
-	
+	bool validateMapping() const;
+		
+	/**
+	 * Returns the cost of the specified edge.
+	 * Looks up the corresponding edge in the original graph
+	 * and retrieves its weight.
+	 * 
+	 * \return
+	 *   weight of e
+	 */
+	double weightOf(edge e) const;
+
 	/**
 	 * Calculates the optimal Steinter tree recursivly.
 	 * Should not be called directly but by STPSolver::solve.
@@ -62,16 +72,75 @@ private:
 	 *	satisfying the upper bound can be found.
 	 */
 	double bnbInternal(double prevCost);
-	
-	/**
-	 * Returns the cost of the specified edge.
-	 * Looks up the corresponding edge in the original graph
-	 * and retrieves its weight.
-	 * 
+
+	/*
+	 * Removes the specified edge from the graph.
+	 * The corresponding original edge is returned.
+	 *
 	 * \return
-	 *   weight of e
+	 *	the original edge, according to m_mapping
 	 */
-	double weightOf(edge e);
+	edge deleteEdge(edge e);
+
+	/*
+	 * Creates a new edge.
+	 *
+	 * \param source
+	 *	the source node of the new edge
+	 * \param target
+	 *	the target node of the new edge
+	 * \param originalEdge
+	 *	the corresponding edge in the original graph
+	 */
+	edge newEdge(node source, node target, edge originalEdge);
+
+	/*
+	 * Moves the source of the edge to the specified node.
+	 *
+	 * \param e
+	 *	the edge to be moved
+	 * \param v
+	 * 	the new source of e
+	 */
+	void moveSource(edge e, node v);
+
+	/*
+	 * Moves the target of the edge to the specified node.
+	 *
+	 * \param e
+	 *	the edge to be moved
+	 * \param v
+	 * 	the new target of e
+	 */
+	void moveTarget(edge e, node v);
+
+	/*
+	 * Updates the status of the given node to
+	 * either terminal or steiner node.
+	 * No side-effects occur even if status is already correct.
+	 *
+	 * \param v
+	 *	the node to be updated
+	 * \param isTerminal
+	 * 	true to set it to terminal
+	 *	false to set it to steiner
+	 */
+	void setTerminal(node v, bool isTerminal);
+
+	/**
+	 * Decides which edge to branch on.
+	 * Might return NULL if current upper bound can not be reached
+	 * with this graph.
+	 * 
+	 * \param prevCost
+	 *	the cost of previously chosen edges
+	 *	used for comparing to current upper bound
+	 *
+	 * \return
+	 *	edge to branch on next
+	 *	might be NULL if current upper bound is not reachable
+	 */
+	edge determineBranchingEdge(double prevCost);
 
 public:
 	/**

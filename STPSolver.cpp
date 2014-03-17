@@ -35,7 +35,7 @@ STPSolver::STPSolver(
 	} 
 }
 
-void STPSolver::writeSVG(const std::string &filename)
+void STPSolver::writeSVG(const std::string &filename) const
 {
 	GraphAttributes attr(m_graph,
 	  GraphAttributes::edgeGraphics |
@@ -64,7 +64,8 @@ void STPSolver::writeSVG(const std::string &filename)
 	GraphIO::drawSVG(attr, filename);
 }
 
-double STPSolver::weightOf(edge e) {
+double STPSolver::weightOf(edge e) const
+{
 	double result = MAX_WEIGHT;
 	
 	if(e != NULL) {
@@ -76,7 +77,7 @@ double STPSolver::weightOf(edge e) {
 	return result;
 }
 
-bool STPSolver::validateMapping()
+bool STPSolver::validateMapping() const
 {
 	edge e;
 	forall_edges(e, m_graph) {
@@ -87,9 +88,133 @@ bool STPSolver::validateMapping()
 	return true;
 }
 
+edge STPSolver::deleteEdge(edge e)
+{
+	edge result = m_mapping[e];
+	m_graph.delEdge(e);
+	e->~EdgeElement();
+	return result;
+}
+
+edge STPSolver::newEdge(node source, node target, edge e)
+{
+	edge result = m_graph.newEdge(source, target);
+	m_mapping[result] = e;
+	return result;
+}
+
+void STPSolver::moveSource(edge e, node v)
+{
+	m_graph.moveSource(e, v);
+}
+
+void STPSolver::moveTarget(edge e, node v)
+{
+	m_graph.moveTarget(e, v);
+}
+
+void STPSolver::setTerminal(node v, bool isTerminal)
+{
+	if(isTerminal && !m_isTerminal[v]) {
+		m_terminals.pushFront(v);
+		m_isTerminal[v] = true;
+	}
+	else {
+		if(!isTerminal && m_isTerminal[v]) {
+			m_terminals.del(m_terminals.search(v));
+			m_isTerminal[v] = false;
+		}
+	}
+}
+
 double STPSolver::solve(Graph &tree)
 {
 	return bnbInternal(0);
+}
+
+edge STPSolver::determineBranchingEdge(double prevCost)
+{
+	edge result = NULL;
+	double maxPenalty = -1;
+
+	// calculate penalties for nodes
+	double sumOfMinWeights = 0; // b
+	double sumOfMinTermWeights = 0; // c
+	double absoluteMinTermWeight = MAX_WEIGHT;
+	for(ListConstIterator<node> it = m_terminals.begin(); 
+	  sumOfMinWeights < MAX_WEIGHT && it.valid(); 
+	  ++it) {
+		double minTermWeight = MAX_WEIGHT,
+		       minWeight = MAX_WEIGHT,
+		       secondMinWeight = MAX_WEIGHT;
+		edge minEdge = NULL;
+
+		// investigate all edges of each terminal
+		// calculate lower boundary and find branching edge
+		List<edge> adjEdges;
+		m_graph.adjEdges(*it, adjEdges);
+		for(ListConstIterator<edge> itEdge = adjEdges.begin(); 
+		  itEdge.valid(); 
+		  ++itEdge) {
+			edge e = *itEdge;
+			if(weightOf(e) < minWeight) {
+				secondMinWeight = minWeight;
+				minWeight = weightOf(e);
+				minEdge = e;
+			}
+			else {
+				if(weightOf(e) < secondMinWeight) {
+					secondMinWeight = weightOf(e);
+				}
+			}
+			
+			if(m_isTerminal[e->opposite(*it)] && weightOf(e) < minTermWeight) {
+				minTermWeight = weightOf(e);
+				if(minTermWeight < absoluteMinTermWeight) {
+					absoluteMinTermWeight = minTermWeight;
+				}
+			}
+		}
+
+		if(sumOfMinTermWeights < MAX_WEIGHT && minTermWeight < MAX_WEIGHT) {
+			sumOfMinTermWeights += minTermWeight;
+		}
+		else {
+			sumOfMinTermWeights = MAX_WEIGHT;
+		}
+		OGDF_ASSERT(absoluteMinTermWeight <= sumOfMinTermWeights);
+
+		// is terminal isolated or has only one edge?
+		// if so we can break here
+		if(minWeight == MAX_WEIGHT || 
+		   secondMinWeight == MAX_WEIGHT) {
+			result = minEdge;
+			if(minWeight == MAX_WEIGHT) {
+				sumOfMinWeights = MAX_WEIGHT;
+			}
+		} else {
+			sumOfMinWeights += minWeight;
+			// update branching edge if need be
+			double penalty = secondMinWeight - minWeight;
+			if(penalty > maxPenalty) {
+				maxPenalty = penalty;
+				result = minEdge;
+			}
+		}
+	}
+
+	// compare bounds for this graph
+	if(result != NULL) {
+		double maxCost = m_upperBound - prevCost;
+		if(sumOfMinTermWeights < MAX_WEIGHT) {
+			sumOfMinTermWeights -= absoluteMinTermWeight;
+		}
+		if(maxCost <= sumOfMinWeights && maxCost <= sumOfMinTermWeights) {
+			result = NULL;
+		}
+	}
+
+	return result;
 }
 
 double STPSolver::bnbInternal(double prevCost)
@@ -103,92 +228,25 @@ double STPSolver::bnbInternal(double prevCost)
 			result = prevCost;
 		} 
 		else {
-			edge branchingEdge = NULL;
-			double maxPenalty = -1;
-
-			// calculate penalties for nodes
-			double sumOfMinWeights = 0; // b
-			double sumOfMinTermWeights = 0; // c
-			double absoluteMinTermWeight = MAX_WEIGHT;
-			for(ListConstIterator<node> it = m_terminals.begin(); sumOfMinWeights < MAX_WEIGHT && it.valid(); ++it) {
-				double minTermWeight = MAX_WEIGHT,
-				       minWeight = MAX_WEIGHT,
-				       secondMinWeight = MAX_WEIGHT;
-				edge minEdge = NULL;
-
-				// investigate all edges of each terminal
-				// calculate lower boundary and find branching edge
-				List<edge> adjEdges;
-				m_graph.adjEdges(*it, adjEdges);
-				for(ListConstIterator<edge> itEdge = adjEdges.begin(); itEdge.valid(); ++itEdge) {
-					edge e = *itEdge;
-					if(weightOf(e) < minWeight) {
-						secondMinWeight = minWeight;
-						minWeight = weightOf(e);
-						minEdge = e;
-					}
-					else {
-						if(weightOf(e) < secondMinWeight) {
-							secondMinWeight = weightOf(e);
-						}
-					}
-					
-					if(m_isTerminal[e->opposite(*it)] && weightOf(e) < minTermWeight) {
-						minTermWeight = weightOf(e);
-						if(minTermWeight < absoluteMinTermWeight) {
-							absoluteMinTermWeight = minTermWeight;
-						}
-					}
-				}
-
-				if(sumOfMinTermWeights < MAX_WEIGHT && minTermWeight < MAX_WEIGHT) {
-					sumOfMinTermWeights += minTermWeight;
-				}
-				else {
-					sumOfMinTermWeights = MAX_WEIGHT;
-				}
-				OGDF_ASSERT(absoluteMinTermWeight <= sumOfMinTermWeights);
-
-				// is terminal isolated or has only one edge?
-				// if so we can break here
-				if(minWeight == MAX_WEIGHT || 
-				   secondMinWeight == MAX_WEIGHT) {
-					branchingEdge = minEdge;
-					if(minWeight == MAX_WEIGHT) {
-						sumOfMinWeights = MAX_WEIGHT;
-					}
-				} else {
-					sumOfMinWeights += minWeight;
-					// update branching edge if need be
-					double penalty = secondMinWeight - minWeight;
-					if(penalty > maxPenalty) {
-						maxPenalty = penalty;
-						branchingEdge = minEdge;
-					}
-				}
-			}
-
-			// compare bounds for this graph
-			if(branchingEdge != NULL) {
-				double maxCost = m_upperBound - prevCost;
-				if(sumOfMinTermWeights < MAX_WEIGHT) {
-					sumOfMinTermWeights -= absoluteMinTermWeight;
-				}
-				if(maxCost <= sumOfMinWeights && maxCost <= sumOfMinTermWeights) {
-					branchingEdge = NULL;
-				}
-			}
-
-			OGDF_ASSERT(branchingEdge == NULL || m_mapping[branchingEdge] != NULL);
+			edge branchingEdge = determineBranchingEdge(prevCost);
 			
 			// branching edge has been found or there is no feasible solution
 			if(branchingEdge != NULL && weightOf(branchingEdge) < MAX_WEIGHT) {	
-				// remove branching edge
+				// chose node to remove
 				node nodeToRemove = branchingEdge->source();
 				node targetNode = branchingEdge->target();
-				edge origBranchingEdge = m_mapping[branchingEdge];
-				m_graph.delEdge(branchingEdge);
-				branchingEdge->~EdgeElement();
+			
+				// This seems to speed up things.
+				// Always chosing only terminal nodes to remove 
+				// (or only steiner nodes if possible)
+				// yields even worse running times than no swapping at all.
+				if(randomDouble(0, 1) < 0.5) {
+					nodeToRemove = branchingEdge->target();
+					targetNode = branchingEdge->source();
+				}
+				
+				// remove branching edge
+				edge origBranchingEdge = deleteEdge(branchingEdge);
 
 				// first branch: Inclusion of the edge
 				// remove source node of edge and calculate new edge weights	
@@ -199,13 +257,12 @@ double STPSolver::bnbInternal(double prevCost)
 				
 				List<node> delEdges, movedEdges;
 				List<edge> origDelEdges;
-				ListConstIterator<edge> itNext;
 				
 				List<edge> edges;
 				m_graph.adjEdges(nodeToRemove, edges);
-				for(ListConstIterator<edge> it = edges.begin(); it.valid(); it = itNext) {
+				for(ListConstIterator<edge> it = edges.begin(); it.valid();) {
 					edge e = *it;
-					itNext = it.succ();
+					it = it.succ();
 
 					OGDF_ASSERT(e != branchingEdge);
 					OGDF_ASSERT(e->target() == nodeToRemove || e->source() == nodeToRemove);
@@ -222,8 +279,7 @@ double STPSolver::bnbInternal(double prevCost)
 							delEdges.pushFront(e->target());
 							delEdges.pushFront(e->source());
 							origDelEdges.pushFront(m_mapping[e]);
-							m_graph.delEdge(e);
-							e->~EdgeElement();
+							deleteEdge(e);
 
 							deletedEdgeE = true;
 						}
@@ -231,21 +287,20 @@ double STPSolver::bnbInternal(double prevCost)
 							delEdges.pushFront(f->target());
 							delEdges.pushFront(f->source());
 							origDelEdges.pushFront(m_mapping[f]);
-							m_graph.delEdge(f);
-							e->~EdgeElement();
+							deleteEdge(f);
 						}
 					}
 					if(!deletedEdgeE) {	
 						if(e->target() == nodeToRemove) {
 							OGDF_ASSERT(e->source() != targetNode);
 							movedEdges.pushFront(e->source());
-							m_graph.moveTarget(e, targetNode);
+							moveTarget(e, targetNode);
 						}
 						else {
 							OGDF_ASSERT(e->source() == nodeToRemove)
 							OGDF_ASSERT(e->target() != targetNode)
 							movedEdges.pushFront(e->target());
-							m_graph.moveSource(e, targetNode);
+							moveSource(e, targetNode);
 						}
 					}
 				}
@@ -254,29 +309,21 @@ double STPSolver::bnbInternal(double prevCost)
 				// (easier to keep track of CopyGraph mapping)
 				
 				// remove node from terminals too
-				bool remNodeIsTerminal = m_isTerminal[nodeToRemove],
-                                     targetNodeIsTerminal = m_isTerminal[targetNode];
-				if(remNodeIsTerminal) {
-					m_terminals.del(m_terminals.search(nodeToRemove));
-					m_isTerminal[nodeToRemove] = false;
-				}
-				if(!targetNodeIsTerminal) {
-					m_terminals.pushFront(targetNode);
-					m_isTerminal[targetNode] = true;
-				}
+				bool targetNodeIsTerminal = m_isTerminal[targetNode],
+				     nodeToRemoveIsTerminal = m_isTerminal[nodeToRemove];
+
+				OGDF_ASSERT(targetNodeIsTerminal || nodeToRemoveIsTerminal);
+				setTerminal(nodeToRemove, false);
+				setTerminal(targetNode, true);
 
 				// calculate result on modified graph
 				result = bnbInternal(weightOf(branchingEdge) + prevCost);
 				
-				// restore previous graph	
-				if(remNodeIsTerminal) {
-					m_terminals.pushFront(nodeToRemove);
-					m_isTerminal[nodeToRemove] = true;
-				}
-				if(!targetNodeIsTerminal) {
-					m_terminals.del(m_terminals.search(targetNode));
-					m_isTerminal[targetNode] = false;
-				}
+				// restore previous graph
+
+				// restore terminals
+				setTerminal(nodeToRemove, nodeToRemoveIsTerminal);
+				setTerminal(targetNode, targetNodeIsTerminal);	
 			      
 				// restore moved edges 
 				while(!movedEdges.empty()) {
@@ -290,20 +337,21 @@ double STPSolver::bnbInternal(double prevCost)
 					OGDF_ASSERT(e->opposite(targetNode) != nodeToRemove);
 		
 					if(e->source() == v) {
-						m_graph.moveTarget(e, nodeToRemove);
+						moveTarget(e, nodeToRemove);
 					}
 					else {
-						m_graph.moveSource(e, nodeToRemove);
+						moveSource(e, nodeToRemove);
 					}
 				}
 
 				// restored deleted edges
 				while(!delEdges.empty()) {
+					OGDF_ASSERT(!origDelEdges.empty());
+					
 					node source = delEdges.popFrontRet();
 					node target = delEdges.popFrontRet();
-					edge e = m_graph.newEdge(source, target);
-					OGDF_ASSERT(!origDelEdges.empty());
-					m_mapping[e] = origDelEdges.popFrontRet();
+
+					newEdge(source, target, origDelEdges.popFrontRet());
 				}
 				OGDF_ASSERT(origDelEdges.empty());
 				
@@ -316,11 +364,10 @@ double STPSolver::bnbInternal(double prevCost)
 				}
 
 				// finally: restore the branching edge
-				edge f = m_graph.newEdge(nodeToRemove, targetNode);
-				m_mapping[f] = origBranchingEdge;
+				newEdge(nodeToRemove, targetNode, origBranchingEdge);
 			}
 		}
-		//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
+		OGDF_ASSERT(validateMapping());
 	}
 	return result;
 }
