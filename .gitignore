@@ -4,3 +4,5 @@ data/
 svg/
 stp-solver
 main
+*.swp
+**/*.swp

@@ -237,10 +237,7 @@ double STPSolver::bnbInternal(double prevCost)
 				node targetNode = branchingEdge->target();
 			
 				// This seems to speed up things.
-				// Always chosing only terminal nodes to remove 
-				// (or only steiner nodes if possible)
-				// yields even worse running times than no swapping at all.
-				if(randomDouble(0, 1) < 0.5) {
+				if(nodeToRemove->degree() < targetNode->degree()) {
 					nodeToRemove = branchingEdge->target();
 					targetNode = branchingEdge->source();
 				}

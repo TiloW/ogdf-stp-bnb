@@ -24,7 +24,6 @@ File.open('bench.txt').each do |line|
     tmp = /solution costs (?<cost>\d+(\.\d+)?)./.match(out)
     cost = tmp ? tmp[:cost] : Infinity
   
-    # TODO: Assert result is optimal
     if cost != optCost
       puts "found bad solution: #{cost}"
       puts "Optimal solution is #{optCost}"
