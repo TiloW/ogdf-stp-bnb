@@ -31,6 +31,9 @@ run: stp-solver
 run-ext: stp-solver
 	./stp-solver data/B/b01.stp
 
+bench:
+	ruby bench.rb stp-solver
+
 all: $(BINARIES)
 
 stp-solver: stp-solver.o
