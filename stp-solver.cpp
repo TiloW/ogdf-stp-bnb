@@ -123,20 +123,6 @@ double bnbInternal(
 	double result = MAX_WEIGHT;
 	
 	if(prevCost < upperBound) {
-		/*
-		std::stringstream ss;
-		ss << "svg/" << depth << ".svg";
-		writeSVG(graph, terminals, ss.str());
-
-
-		for(int i = 0; i < depth; i++) cout << " ";
-		cout << terminals.size() << "  |  " << prevCost << endl;
-
-		OGDF_ASSERT(isLoopFree(graph));
-		OGDF_ASSERT(isParallelFreeUndirected(graph));
-		OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
-		*/
-		
 		// TODO: Construct tree	
 		if(terminals.size() < 2) {
 			// all terminals are connected
@@ -220,16 +206,9 @@ double bnbInternal(
 			}
 
 			OGDF_ASSERT(branchingEdge == NULL || mapping[branchingEdge] != NULL);
-			/*
-			OGDF_ASSERT(graph.consistencyCheck());
-			OGDF_ASSERT(isParallelFreeUndirected(graph));		
-			OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
-			*/
+			
 			// branching edge has been found or there is no feasible solution
-			if(branchingEdge != NULL && origWeights[mapping[branchingEdge]] < MAX_WEIGHT) {
-				//for(int i = 0; i < depth; i++) cout << " ";
-				//cout << "branching edge " << branchingEdge << endl;
-				
+			if(branchingEdge != NULL && origWeights[mapping[branchingEdge]] < MAX_WEIGHT) {	
 				// remove branching edge
 				node nodeToRemove = branchingEdge->source();
 				node targetNode = branchingEdge->target();
@@ -244,26 +223,16 @@ double bnbInternal(
 				OGDF_ASSERT(graph.searchEdge(targetNode, nodeToRemove) == NULL);
 				OGDF_ASSERT(graph.searchEdge(nodeToRemove, targetNode) == NULL);
 				
-				List<edge> edges;
-				graph.adjEdges(nodeToRemove, edges);
-				/*
-				forall_listiterators(edge, it, edges) {
-					OGDF_ASSERT(branchingEdge != *it);
-					OGDF_ASSERT((*it)->opposite(nodeToRemove) != targetNode);
-				}
-				for(int i = 0; i <= depth; i++) cout << " ";
-				cout << "found " << edges.size() << " edges that need to be moved" << endl;
-				*/
 				List<node> delEdges, movedEdges;
 				List<edge> origDelEdges;
 				ListConstIterator<edge> itNext;
+				
+				List<edge> edges;
+				graph.adjEdges(nodeToRemove, edges);
 				for(ListConstIterator<edge> it = edges.begin(); it.valid(); it = itNext) {
 					edge e = *it;
 					itNext = it.succ();
 
-					//for(int i = 0; i <= depth; i++) cout << " ";
-					//cout << "checking edge " << e << endl;
-		
 					OGDF_ASSERT(e != branchingEdge);
 					OGDF_ASSERT(e->target() == nodeToRemove || e->source() == nodeToRemove);
 					OGDF_ASSERT(e->opposite(nodeToRemove) != targetNode);
@@ -275,15 +244,12 @@ double bnbInternal(
 					}
 					bool deletedEdgeE = false;
 					if(f != NULL) {
-						//for(int i = 0; i <= depth; i++) cout << " ";
-						//cout << "> found conflicting edge: " << f << ".. deleting edge with higher weight" << endl;
 						if(origWeights[mapping[f]] < origWeights[mapping[e]]) {
 							delEdges.pushFront(e->target());
 							delEdges.pushFront(e->source());
 							origDelEdges.pushFront(mapping[e]);
 							graph.delEdge(e);
 							e->~EdgeElement();
-							//OGDF_ASSERT(graph.consistencyCheck());
 
 							deletedEdgeE = true;
 						}
@@ -293,27 +259,19 @@ double bnbInternal(
 							origDelEdges.pushFront(mapping[f]);
 							graph.delEdge(f);
 							e->~EdgeElement();
-							//OGDF_ASSERT(graph.consistencyCheck());
 						}
 					}
-					if(!deletedEdgeE) {
-						//for(int i = 0; i <= depth; i++) cout << " ";
-						//cout << "> edge " << e << " was not deleted and will thus be moved" << endl;
-						
+					if(!deletedEdgeE) {	
 						if(e->target() == nodeToRemove) {
 							OGDF_ASSERT(e->source() != targetNode);
 							movedEdges.pushFront(e->source());
 							graph.moveTarget(e, targetNode);
-							//OGDF_ASSERT(graph.consistencyCheck());
-							//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 						}
 						else {
 							OGDF_ASSERT(e->source() == nodeToRemove)
 							OGDF_ASSERT(e->target() != targetNode)
 							movedEdges.pushFront(e->target());
 							graph.moveSource(e, targetNode);
-							//OGDF_ASSERT(graph.consistencyCheck());
-							//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 						}
 					}
 				}
@@ -334,7 +292,6 @@ double bnbInternal(
 				}
 
 				// calculate result on modified graph
-				OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 				result = bnbInternal(
 				  graph, 
 				  mapping,
@@ -345,7 +302,6 @@ double bnbInternal(
 				  upperBound, 
 				  origWeights[mapping[branchingEdge]] + prevCost, 
 				  depth+1);
-				OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 				
 				// update upper bound according to inclusion branch
 				if(result < upperBound) {
@@ -373,21 +329,12 @@ double bnbInternal(
 					OGDF_ASSERT(e != NULL);
 					OGDF_ASSERT(e->opposite(targetNode) != nodeToRemove);
 		
-					//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
-					//edge f;
-					//cout << v << endl;
 					if(e->source() == v) {
-						//f = 
 						graph.moveTarget(e, nodeToRemove);
-						//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 					}
 					else {
-						//f = 
 						graph.moveSource(e, nodeToRemove);
-						//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 					}
-					//for(int i = 0; i <= depth; i++) cout << " ";
-					//cout << "moved edge " << f << " to former position" << endl;
 				}
 
 				// restored deleted edges
@@ -397,11 +344,8 @@ double bnbInternal(
 					edge e = graph.newEdge(source, target);
 					OGDF_ASSERT(!origDelEdges.empty());
 					mapping[e] = origDelEdges.popFrontRet();
-					//for(int i = 0; i <= depth; i++) cout << " ";
-					//cout << "restored formerly deleted edge " << e << endl;
 				}
 				OGDF_ASSERT(origDelEdges.empty());
-				//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 				
 				// sencond branch: Exclusion of the edge
 				double exEdgeResult = bnbInternal(
@@ -423,7 +367,6 @@ double bnbInternal(
 				// finally: restore the branching edge
 				edge f = graph.newEdge(nodeToRemove, targetNode);
 				mapping[f] = origBranchingEdge;
-				//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
 			}
 		}
 		//OGDF_ASSERT(validateMapping(graph, mapping, origWeights));
@@ -441,8 +384,6 @@ double bnbInternal(
  *	the weight of each edge
  * \param terminals
  *	the set of terminal nodes, as opposed to steiner nodes
- * \param isTerminal
- *	mapping for each node whether it is a terminal or a steiner node
  * \param tree
  *	will hold the resulting tree
  *
@@ -483,11 +424,6 @@ double calcSolution(
 		copiedTerminals.pushFront(copiedNodes[*it]);
 		isTerminal[copiedNodes[*it]] = true;
 	}
-	
-	//EdgeComparer comp(&origEdges, &weights);
-
-	//writeSVG(graph, terminals, "original.svg");
-	//writeSVG(copiedGraph, copiedTerminals, "copy.svg");
 
 	return bnbInternal(
 	  copiedGraph, 
