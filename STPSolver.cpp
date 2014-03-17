@@ -10,8 +10,8 @@ STPSolver::STPSolver(
 {
 	m_upperBound = MAX_WEIGHT;
 	m_graph = Graph();
-	m_mapping = EdgeArray<edge>(m_graph);
-	m_isTerminal = NodeArray<bool>(m_graph, false);
+	m_mapping.init(m_graph);
+	m_isTerminal.init(m_graph, NULL);
 	
 	NodeArray<node> copiedNodes(m_originalGraph);
 
@@ -30,8 +30,7 @@ STPSolver::STPSolver(
 	}
 
 	forall_listiterators(node, it, m_originalTerminals) {
-		m_terminals.pushFront(copiedNodes[*it]);
-		m_isTerminal[copiedNodes[*it]] = true;
+		setTerminal(copiedNodes[*it], true);
 	} 
 }
 
@@ -49,7 +48,7 @@ void STPSolver::writeSVG(const std::string &filename) const
 		std::stringstream ss;
 		ss << v;
 		attr.label(v) = ss.str();
-		if(m_isTerminal[v]) {
+		if(isTerminal(v)) {
 			attr.fillColor(v) = Color::Red;
 		}
 	}
@@ -64,7 +63,7 @@ void STPSolver::writeSVG(const std::string &filename) const
 	GraphIO::drawSVG(attr, filename);
 }
 
-double STPSolver::weightOf(edge e) const
+double STPSolver::weightOf(const edge e) const
 {
 	double result = MAX_WEIGHT;
 	
@@ -113,18 +112,22 @@ void STPSolver::moveTarget(edge e, node v)
 	m_graph.moveTarget(e, v);
 }
 
-void STPSolver::setTerminal(node v, bool isTerminal)
+void STPSolver::setTerminal(const node v, bool makeTerminal)
 {
-	if(isTerminal && !m_isTerminal[v]) {
-		m_terminals.pushFront(v);
-		m_isTerminal[v] = true;
+	if(makeTerminal && !isTerminal(v)){
+		m_isTerminal[v] = m_terminals.pushFront(v);
 	}
 	else {
-		if(!isTerminal && m_isTerminal[v]) {
-			m_terminals.del(m_terminals.search(v));
-			m_isTerminal[v] = false;
+		if(!makeTerminal && isTerminal(v)) {
+			m_terminals.del(m_isTerminal[v]);
+			m_isTerminal[v] = NULL;
 		}
 	}
+}
+
+bool STPSolver::isTerminal(const node v) const
+{
+	return m_isTerminal[v].valid();
 }
 
 double STPSolver::solve(Graph &tree)
@@ -132,7 +135,7 @@ double STPSolver::solve(Graph &tree)
 	return bnbInternal(0);
 }
 
-edge STPSolver::determineBranchingEdge(double prevCost)
+edge STPSolver::determineBranchingEdge(double prevCost) const
 {
 	edge result = NULL;
 	double maxPenalty = -1;
@@ -144,6 +147,7 @@ edge STPSolver::determineBranchingEdge(double prevCost)
 	for(ListConstIterator<node> it = m_terminals.begin(); 
 	  sumOfMinWeights < MAX_WEIGHT && it.valid(); 
 	  ++it) {
+		const node t = *it;
 		double minTermWeight = MAX_WEIGHT,
 		       minWeight = MAX_WEIGHT,
 		       secondMinWeight = MAX_WEIGHT;
@@ -151,12 +155,8 @@ edge STPSolver::determineBranchingEdge(double prevCost)
 
 		// investigate all edges of each terminal
 		// calculate lower boundary and find branching edge
-		List<edge> adjEdges;
-		m_graph.adjEdges(*it, adjEdges);
-		for(ListConstIterator<edge> itEdge = adjEdges.begin(); 
-		  itEdge.valid(); 
-		  ++itEdge) {
-			edge e = *itEdge;
+		for(adjEntry adj = t->firstAdj(); adj; adj = adj->succ())  {
+			edge e = adj->theEdge();
 			if(weightOf(e) < minWeight) {
 				secondMinWeight = minWeight;
 				minWeight = weightOf(e);
@@ -168,7 +168,7 @@ edge STPSolver::determineBranchingEdge(double prevCost)
 				}
 			}
 			
-			if(m_isTerminal[e->opposite(*it)] && weightOf(e) < minTermWeight) {
+			if(isTerminal(adj->twinNode()) && weightOf(e) < minTermWeight) {
 				minTermWeight = weightOf(e);
 				if(minTermWeight < absoluteMinTermWeight) {
 					absoluteMinTermWeight = minTermWeight;
@@ -255,11 +255,10 @@ double STPSolver::bnbInternal(double prevCost)
 				List<node> delEdges, movedEdges;
 				List<edge> origDelEdges;
 				
-				List<edge> edges;
-				m_graph.adjEdges(nodeToRemove, edges);
-				for(ListConstIterator<edge> it = edges.begin(); it.valid();) {
-					edge e = *it;
-					it = it.succ();
+				adjEntry adjNext;
+				for(adjEntry adj = nodeToRemove->firstAdj(); adj; adj = adjNext) {
+					adjNext = adj->succ();
+					edge e = adj->theEdge();
 
 					OGDF_ASSERT(e != branchingEdge);
 					OGDF_ASSERT(e->target() == nodeToRemove || e->source() == nodeToRemove);
@@ -306,8 +305,8 @@ double STPSolver::bnbInternal(double prevCost)
 				// (easier to keep track of CopyGraph mapping)
 				
 				// remove node from terminals too
-				bool targetNodeIsTerminal = m_isTerminal[targetNode],
-				     nodeToRemoveIsTerminal = m_isTerminal[nodeToRemove];
+				bool targetNodeIsTerminal = isTerminal(targetNode),
+				     nodeToRemoveIsTerminal = isTerminal(nodeToRemove);
 
 				OGDF_ASSERT(targetNodeIsTerminal || nodeToRemoveIsTerminal);
 				setTerminal(nodeToRemove, false);
@@ -341,7 +340,7 @@ double STPSolver::bnbInternal(double prevCost)
 					}
 				}
 
-				// restored deleted edges
+				// restore deleted edges
 				while(!delEdges.empty()) {
 					OGDF_ASSERT(!origDelEdges.empty());
 					

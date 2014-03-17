@@ -24,7 +24,7 @@ private:
 	
 	Graph m_graph;
 	List<node> m_terminals;
-	NodeArray<bool> m_isTerminal;
+	NodeArray<ListIterator<node>> m_isTerminal;
 	EdgeArray<edge> m_mapping;
 	
     	double m_upperBound;
@@ -61,7 +61,8 @@ private:
 	/**
 	 * Calculates the optimal Steinter tree recursivly.
 	 * Should not be called directly but by STPSolver::solve.
-	 * Each edge is either included or excluded, which gives rise to up to two new branches in each step.
+	 * Each edge is either included or excluded, 
+	 * which gives rise to up to two new branches in each step.
 	 * 
 	 * \param prevCost
 	 *	the cost accumulated in previous recursion steps (previously included edges)
@@ -73,7 +74,7 @@ private:
 	 */
 	double bnbInternal(double prevCost);
 
-	/*
+	/**
 	 * Removes the specified edge from the graph.
 	 * The corresponding original edge is returned.
 	 *
@@ -82,7 +83,7 @@ private:
 	 */
 	edge deleteEdge(edge e);
 
-	/*
+	/**
 	 * Creates a new edge.
 	 *
 	 * \param source
@@ -92,9 +93,9 @@ private:
 	 * \param originalEdge
 	 *	the corresponding edge in the original graph
 	 */
-	edge newEdge(node source, node target, edge originalEdge);
+	edge newEdge(node source, node target, const edge originalEdge);
 
-	/*
+	/**
 	 * Moves the source of the edge to the specified node.
 	 *
 	 * \param e
@@ -104,7 +105,7 @@ private:
 	 */
 	void moveSource(edge e, node v);
 
-	/*
+	/**
 	 * Moves the target of the edge to the specified node.
 	 *
 	 * \param e
@@ -114,18 +115,32 @@ private:
 	 */
 	void moveTarget(edge e, node v);
 
-	/*
+	/**
 	 * Updates the status of the given node to
 	 * either terminal or steiner node.
 	 * No side-effects occur even if status is already correct.
 	 *
 	 * \param v
 	 *	the node to be updated
-	 * \param isTerminal
+	 * \param makeTerminal
 	 * 	true to set it to terminal
 	 *	false to set it to steiner
 	 */
-	void setTerminal(node v, bool isTerminal);
+	void setTerminal(const node v, bool makeTerminal);
+
+	/**
+	 * Returns whether this node is a terminal or
+	 * a steiner node.
+	 *
+	 * \param v
+	 *	the node to check
+	 *
+	 * \return
+	 *	true if v is a terminal
+	 * 	false otherwise
+	 *
+	 */
+	bool isTerminal(const node v) const;
 
 	/**
 	 * Decides which edge to branch on.
@@ -140,7 +155,7 @@ private:
 	 *	edge to branch on next
 	 *	might be NULL if current upper bound is not reachable
 	 */
-	edge determineBranchingEdge(double prevCost);
+	edge determineBranchingEdge(double prevCost) const;
 
 public:
 	/**
@@ -161,7 +176,6 @@ public:
 	 * 
 	 * \param tree
 	 * 	will hold the included edges, not yet implemented
-	 *	TODO: Consider EdgeArray<bool>
 	 */
 	double solve(Graph &tree);
 };
