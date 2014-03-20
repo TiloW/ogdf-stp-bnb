@@ -5,6 +5,7 @@
 #include <string>
 
 #include <ogdf/basic/Graph.h>
+#include <ogdf/basic/tuples.h>
 #include <ogdf/basic/List.h>
 #include <ogdf/basic/EdgeArray.h>
 #include <ogdf/basic/NodeArray.h>
@@ -17,15 +18,15 @@ using namespace ogdf;
 
 class STPSolver
 {
+	typedef Tuple2<node,node> NodeTuple;
 private:
+	const NodeTuple NO_EDGE = NodeTuple(NULL, NULL);
 	const Graph &m_originalGraph;
 	const EdgeArray<double> &m_originalWeights;
 	const List<node> &m_originalTerminals;
 	
-	Graph m_graph;
 	List<node> m_terminals;
 	NodeArray<ListIterator<node>> m_isTerminal;
-	EdgeArray<edge> m_mapping;
 	
     	double m_upperBound;
 
@@ -38,7 +39,7 @@ private:
 	 * \param filename
 	 * 	the name of the SVG file to be created
 	 */
-	void writeSVG(const std::string &filename) const;
+	//void writeSVG(const std::string &filename) const;
 
 	/**
 	 * Used to validate the current mapping of edges to orignal edges
@@ -58,7 +59,11 @@ private:
 	 * \return
 	 *   weight of e
 	 */
-	double weightOf(edge e) const;
+	double weightOf(const node u, const node v) const;
+
+	double weightOf(const NodeTuple &e) const;
+
+	double weightOf(const edge e) const;
 
 	/**
 	 * Calculates the optimal Steinter tree recursivly.
@@ -76,46 +81,14 @@ private:
 	 */
 	double bnbInternal(double prevCost);
 
-	/**
-	 * Removes the specified edge from the graph.
-	 * The corresponding original edge is returned.
-	 *
-	 * \return
-	 *	the original edge, according to m_mapping
-	 */
-	edge deleteEdge(edge e);
+	// TODO 
+	void delEdge(const node u, const node v);
 
-	/**
-	 * Creates a new edge.
-	 *
-	 * \param source
-	 *	the source node of the new edge
-	 * \param target
-	 *	the target node of the new edge
-	 * \param originalEdge
-	 *	the corresponding edge in the original graph
-	 */
-	edge newEdge(node source, node target, const edge originalEdge);
+	// TODO
+	void setEdge(const node u, const node v, const edge e);
 
-	/**
-	 * Moves the source of the edge to the specified node.
-	 *
-	 * \param e
-	 *	the edge to be moved
-	 * \param v
-	 * 	the new source of e
-	 */
-	void moveSource(edge e, node v);
-
-	/**
-	 * Moves the target of the edge to the specified node.
-	 *
-	 * \param e
-	 *	the edge to be moved
-	 * \param v
-	 * 	the new target of e
-	 */
-	void moveTarget(edge e, node v);
+	// TODO
+	void moveEdge(const node u, const node v, const node w);
 
 	/**
 	 * Updates the status of the given node to
@@ -145,18 +118,6 @@ private:
 	bool isTerminal(const node v) const;
 
 	/**
-	 * Sets the edge incident to both node u and v.
-	 * Used for faster lookup.
-	 *
-	 * \param u
-	 *	one of the nodes of the undirected edge
-	 * \param v
-	 *	the opposite node of u
-	 *
-	 */
-	void setEdgeLookup(const node u, const node v, const edge e);
-
-	/**
 	 * Retrieves the edge incident to both node u and v.
 	 *
 	 * \param u
@@ -183,7 +144,7 @@ private:
 	 *	edge to branch on next
 	 *	might be NULL if current upper bound is not reachable
 	 */
-	edge determineBranchingEdge(double prevCost) const;
+	NodeTuple determineBranchingEdge(double prevCost) const;
 
 public:
 	/**

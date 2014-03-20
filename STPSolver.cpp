@@ -9,33 +9,20 @@ STPSolver::STPSolver(
     m_originalTerminals(terminals)
 {
 	m_upperBound = MAX_WEIGHT;
-	m_graph = Graph();
-	m_mapping.init(m_graph);
-	m_isTerminal.init(m_graph, NULL);
+	m_isTerminal.init(m_originalGraph, NULL);
 	int nodeCount = m_originalGraph.numberOfNodes();
 	m_edges = Array2D<edge>(0, nodeCount, 0, nodeCount, NULL);
-	
-	NodeArray<node> copiedNodes(m_originalGraph);
-
-	node v;
-	forall_nodes(v, m_originalGraph) {
-		node copiedNode = m_graph.newNode();
-		copiedNodes[v] = copiedNode;
-	}
 
 	edge e;
 	forall_edges(e, m_originalGraph) {
-		node source = copiedNodes[e->source()],
-		     target = copiedNodes[e->target()];
-		
-		newEdge(source, target, e);
+		setEdge(e->source(), e->target(), e);
 	}
 
 	forall_listiterators(node, it, m_originalTerminals) {
-		setTerminal(copiedNodes[*it], true);
+		setTerminal(*it, true);
 	} 
 }
-
+/*
 void STPSolver::writeSVG(const std::string &filename) const
 {
 	GraphAttributes attr(m_graph,
@@ -64,75 +51,53 @@ void STPSolver::writeSVG(const std::string &filename) const
 	layout.call(attr);
 	GraphIO::drawSVG(attr, filename);
 }
+*/
 
-double STPSolver::weightOf(const edge e) const
+double STPSolver::weightOf(const node u, const node v) const
 {
 	double result = MAX_WEIGHT;
-	
+
+	edge e = lookupEdge(u, v);
 	if(e != NULL) {
-		OGDF_ASSERT(m_mapping[e] != NULL);
-		OGDF_ASSERT(m_mapping[e]->graphOf() == &m_originalGraph);
-		result = m_originalWeights[m_mapping[e]];
+		OGDF_ASSERT(e->graphOf() == &m_originalGraph);
+		result = m_originalWeights[e];
 	}
 	
 	return result;
 }
 
-bool STPSolver::validateMapping() const
+double STPSolver::weightOf(const NodeTuple &e) const
 {
-	edge e;
-	forall_edges(e, m_graph) {
-		OGDF_ASSERT(m_mapping[e] != NULL);
-		OGDF_ASSERT(m_mapping[e]->graphOf() == &m_originalGraph);
-		OGDF_ASSERT(m_originalWeights[m_mapping[e]]);
-	}
-	return true;
+	return weightOf(e.x1(), e.x2());
 }
 
 edge STPSolver::lookupEdge(const node u, const node v) const
 {
-	return m_edges(u->index(), v->index());
+	edge result = NULL;
+	if(u != NULL && v != NULL) {
+		OGDF_ASSERT(u->graphOf() == &m_originalGraph);
+		OGDF_ASSERT(v->graphOf() == &m_originalGraph);
+		result = m_edges(u->index(), v->index());
+	}
+	return result;
 }
 
-void STPSolver::setEdgeLookup(const node u, const node v, const edge e)
+void STPSolver::setEdge(const node u, const node v, const edge e)
 {
 	m_edges(u->index(), v->index()) = 
 	  m_edges(v->index(), u->index()) = e;
 }
 
-edge STPSolver::deleteEdge(edge e)
+void STPSolver::delEdge(const node u, const node v)
 {
-	edge result = m_mapping[e];
-	setEdgeLookup(e->source(), e->target(), NULL);
-	m_graph.delEdge(e);
-	e->~EdgeElement();
-	
-	return result;
+	setEdge(u, v, NULL);
 }
 
-edge STPSolver::newEdge(node source, node target, edge e)
+void STPSolver::moveEdge(node u, node v, node w)
 {
-	edge result = m_graph.newEdge(source, target);
-	m_mapping[result] = e;
-	setEdgeLookup(source, target, result);
-
-	return result;
-}
-
-void STPSolver::moveSource(edge e, node v)
-{
-	OGDF_ASSERT(e != NULL);
-	setEdgeLookup(e->source(), e->target(), NULL);
-	setEdgeLookup(v, e->target(), e);
-	m_graph.moveSource(e, v);
-}
-
-void STPSolver::moveTarget(edge e, node v)
-{
-	OGDF_ASSERT(e != NULL);
-	setEdgeLookup(e->source(), e->target(), NULL);
-	setEdgeLookup(e->source(), v, e);
-	m_graph.moveTarget(e, v);
+	OGDF_ASSERT(lookupEdge(u, v) != NULL);
+	setEdge(w, v, lookupEdge(u, v));
+	setEdge(u, v, NULL);
 }
 
 void STPSolver::setTerminal(const node v, bool makeTerminal)
@@ -158,9 +123,9 @@ double STPSolver::solve(Graph &tree)
 	return bnbInternal(0);
 }
 
-edge STPSolver::determineBranchingEdge(double prevCost) const
+STPSolver::NodeTuple STPSolver::determineBranchingEdge(double prevCost) const
 {
-	edge result = NULL;
+	NodeTuple result = NO_EDGE;
 	double maxPenalty = -1;
 
 	// calculate penalties for nodes
@@ -174,25 +139,25 @@ edge STPSolver::determineBranchingEdge(double prevCost) const
 		double minTermWeight = MAX_WEIGHT,
 		       minWeight = MAX_WEIGHT,
 		       secondMinWeight = MAX_WEIGHT;
-		edge minEdge = NULL;
+		NodeTuple minEdge(NULL, NULL);
 
 		// investigate all edges of each terminal
 		// calculate lower boundary and find branching edge
-		for(adjEntry adj = t->firstAdj(); adj; adj = adj->succ())  {
-			edge e = adj->theEdge();
-			if(weightOf(e) < minWeight) {
+		node v;
+		forall_nodes(v, m_originalGraph) {
+			if(weightOf(t, v) < minWeight) {
 				secondMinWeight = minWeight;
-				minWeight = weightOf(e);
-				minEdge = e;
+				minWeight = weightOf(t, v);
+				minEdge = Tuple2<node,node>(t, v);
 			}
 			else {
-				if(weightOf(e) < secondMinWeight) {
-					secondMinWeight = weightOf(e);
+				if(weightOf(t, v) < secondMinWeight) {
+					secondMinWeight = weightOf(t, v);
 				}
 			}
 			
-			if(isTerminal(adj->twinNode()) && weightOf(e) < minTermWeight) {
-				minTermWeight = weightOf(e);
+			if(isTerminal(v) && weightOf(t, v) < minTermWeight) {
+				minTermWeight = weightOf(t, v);
 				if(minTermWeight < absoluteMinTermWeight) {
 					absoluteMinTermWeight = minTermWeight;
 				}
@@ -227,13 +192,13 @@ edge STPSolver::determineBranchingEdge(double prevCost) const
 	}
 
 	// compare bounds for this graph
-	if(result != NULL) {
+	if(result != NO_EDGE) {
 		double maxCost = m_upperBound - prevCost;
 		if(sumOfMinTermWeights < MAX_WEIGHT) {
 			sumOfMinTermWeights -= absoluteMinTermWeight;
 		}
 		if(maxCost <= sumOfMinWeights && maxCost <= sumOfMinTermWeights) {
-			result = NULL;
+			result = NO_EDGE;
 		}
 	}
 
@@ -251,71 +216,55 @@ double STPSolver::bnbInternal(double prevCost)
 			result = prevCost;
 		} 
 		else {
-			edge branchingEdge = determineBranchingEdge(prevCost);
-			
+			NodeTuple branchingEdge = determineBranchingEdge(prevCost);
+
 			// branching edge has been found or there is no feasible solution
-			if(branchingEdge != NULL && weightOf(branchingEdge) < MAX_WEIGHT) {	
+			if(weightOf(branchingEdge) < MAX_WEIGHT) {	
 				// chose node to remove
-				node nodeToRemove = branchingEdge->source();
-				node targetNode = branchingEdge->target();
-			
+				node nodeToRemove = branchingEdge.x1();
+				node targetNode = branchingEdge.x2();
+			/*
 				// This seems to speed up things.
 				if(nodeToRemove->degree() < targetNode->degree()) {
-					nodeToRemove = branchingEdge->target();
-					targetNode = branchingEdge->source();
+					nodeToRemove = branchingEdge.x2();
+					targetNode = branchingEdge.x1();
 				}
-				
+			*/	
 				// remove branching edge
-				edge origBranchingEdge = deleteEdge(branchingEdge);
+				edge origBranchingEdge = lookupEdge(nodeToRemove, targetNode);
+				OGDF_ASSERT(origBranchingEdge != NULL);
+				delEdge(nodeToRemove, targetNode);
 
 				// first branch: Inclusion of the edge
 				// remove source node of edge and calculate new edge weights	
 				OGDF_ASSERT(targetNode != NULL);
 				OGDF_ASSERT(nodeToRemove != NULL);
-				OGDF_ASSERT(m_graph.searchEdge(targetNode, nodeToRemove) == NULL);
-				OGDF_ASSERT(m_graph.searchEdge(nodeToRemove, targetNode) == NULL);
 				
 				List<node> delEdges, movedEdges;
 				List<edge> origDelEdges;
 				
-				adjEntry adjNext;
-				for(adjEntry adj = nodeToRemove->firstAdj(); adj; adj = adjNext) {
-					adjNext = adj->succ();
-					edge e = adj->theEdge();
-
-					OGDF_ASSERT(e != branchingEdge);
-					OGDF_ASSERT(e->target() == nodeToRemove || e->source() == nodeToRemove);
-					OGDF_ASSERT(adj->twinNode() != targetNode);
-
-					edge f = lookupEdge(targetNode, adj->twinNode());
+				node v;
+				forall_nodes(v, m_originalGraph) {
 					bool deletedEdgeE = false;
-					if(f != NULL) {
-						if(weightOf(f) < weightOf(e)) {
-							delEdges.pushFront(e->target());
-							delEdges.pushFront(e->source());
-							origDelEdges.pushFront(m_mapping[e]);
-							deleteEdge(e);
+					// TODO: Only consider non-isolated nodes
+					if(weightOf(v, targetNode) < MAX_WEIGHT) {
+						if(weightOf(v, targetNode) < weightOf(v, nodeToRemove)) {
+							delEdges.pushFront(v);
+							delEdges.pushFront(nodeToRemove);
+							origDelEdges.pushFront(lookupEdge(v, nodeToRemove));
+							delEdge(v, nodeToRemove);
 
 							deletedEdgeE = true;
 						}
 						else {
-							delEdges.pushFront(f->target());
-							delEdges.pushFront(f->source());
-							origDelEdges.pushFront(m_mapping[f]);
-							deleteEdge(f);
+							delEdges.pushFront(v);
+							delEdges.pushFront(targetNode);
+							origDelEdges.pushFront(lookupEdge(v, targetNode));
+							delEdge(v, targetNode);
 						}
-					}
-					if(!deletedEdgeE) {	
-						if(e->target() == nodeToRemove) {
-							OGDF_ASSERT(e->source() != targetNode);
-							movedEdges.pushFront(e->source());
-							moveTarget(e, targetNode);
-						}
-						else {
-							OGDF_ASSERT(e->source() == nodeToRemove)
-							OGDF_ASSERT(e->target() != targetNode)
-							movedEdges.pushFront(e->target());
-							moveSource(e, targetNode);
+		
+						if(!deletedEdgeE) {
+							moveEdge(nodeToRemove, v, targetNode);	
 						}
 					}
 				}
@@ -343,17 +292,8 @@ double STPSolver::bnbInternal(double prevCost)
 				// restore moved edges 
 				while(!movedEdges.empty()) {
 					node v = movedEdges.popFrontRet();
-
-					edge e = lookupEdge(v, targetNode);
-					OGDF_ASSERT(e != NULL);
-					OGDF_ASSERT(e->opposite(targetNode) != nodeToRemove);
-		
-					if(e->source() == v) {
-						moveTarget(e, nodeToRemove);
-					}
-					else {
-						moveSource(e, nodeToRemove);
-					}
+					OGDF_ASSERT(lookupEdge(v, nodeToRemove) == NULL);
+					moveEdge(targetNode, v, nodeToRemove);
 				}
 
 				// restore deleted edges
@@ -363,7 +303,7 @@ double STPSolver::bnbInternal(double prevCost)
 					node source = delEdges.popFrontRet();
 					node target = delEdges.popFrontRet();
 
-					newEdge(source, target, origDelEdges.popFrontRet());
+					setEdge(source, target, origDelEdges.popFrontRet());
 				}
 				OGDF_ASSERT(origDelEdges.empty());
 				
@@ -376,10 +316,10 @@ double STPSolver::bnbInternal(double prevCost)
 				}
 
 				// finally: restore the branching edge
-				newEdge(nodeToRemove, targetNode, origBranchingEdge);
+				setEdge(nodeToRemove, targetNode, origBranchingEdge);
 			}
 		}
-		OGDF_ASSERT(validateMapping());
+		//OGDF_ASSERT(validateMapping());
 	}
 	return result;
 }
