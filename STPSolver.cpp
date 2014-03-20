@@ -95,7 +95,9 @@ void STPSolver::delEdge(const node u, const node v)
 
 void STPSolver::moveEdge(node u, node v, node w)
 {
+	OGDF_ASSERT(u != w);
 	OGDF_ASSERT(lookupEdge(u, v) != NULL);
+	OGDF_ASSERT(lookupEdge(v, w) == NULL);
 	setEdge(w, v, lookupEdge(u, v));
 	setEdge(u, v, NULL);
 }
@@ -139,7 +141,7 @@ STPSolver::NodeTuple STPSolver::determineBranchingEdge(double prevCost) const
 		double minTermWeight = MAX_WEIGHT,
 		       minWeight = MAX_WEIGHT,
 		       secondMinWeight = MAX_WEIGHT;
-		NodeTuple minEdge(NULL, NULL);
+		NodeTuple minEdge = NO_EDGE;
 
 		// investigate all edges of each terminal
 		// calculate lower boundary and find branching edge
@@ -148,7 +150,7 @@ STPSolver::NodeTuple STPSolver::determineBranchingEdge(double prevCost) const
 			if(weightOf(t, v) < minWeight) {
 				secondMinWeight = minWeight;
 				minWeight = weightOf(t, v);
-				minEdge = Tuple2<node,node>(t, v);
+				minEdge = NodeTuple(t, v);
 			}
 			else {
 				if(weightOf(t, v) < secondMinWeight) {
@@ -239,6 +241,7 @@ double STPSolver::bnbInternal(double prevCost)
 				// remove source node of edge and calculate new edge weights	
 				OGDF_ASSERT(targetNode != NULL);
 				OGDF_ASSERT(nodeToRemove != NULL);
+				OGDF_ASSERT(lookupEdge(targetNode, nodeToRemove) == NULL);
 				
 				List<node> delEdges, movedEdges;
 				List<edge> origDelEdges;
@@ -248,6 +251,7 @@ double STPSolver::bnbInternal(double prevCost)
 					bool deletedEdgeE = false;
 					// TODO: Only consider non-isolated nodes
 					if(weightOf(v, targetNode) < MAX_WEIGHT) {
+						OGDF_ASSERT(v != nodeToRemove);
 						if(weightOf(v, targetNode) < weightOf(v, nodeToRemove)) {
 							delEdges.pushFront(v);
 							delEdges.pushFront(nodeToRemove);
@@ -264,6 +268,7 @@ double STPSolver::bnbInternal(double prevCost)
 						}
 		
 						if(!deletedEdgeE) {
+							movedEdges.pushFront(v);
 							moveEdge(nodeToRemove, v, targetNode);	
 						}
 					}
@@ -292,7 +297,6 @@ double STPSolver::bnbInternal(double prevCost)
 				// restore moved edges 
 				while(!movedEdges.empty()) {
 					node v = movedEdges.popFrontRet();
-					OGDF_ASSERT(lookupEdge(v, nodeToRemove) == NULL);
 					moveEdge(targetNode, v, nodeToRemove);
 				}
 
@@ -300,10 +304,10 @@ double STPSolver::bnbInternal(double prevCost)
 				while(!delEdges.empty()) {
 					OGDF_ASSERT(!origDelEdges.empty());
 					
-					node source = delEdges.popFrontRet();
-					node target = delEdges.popFrontRet();
+					node u = delEdges.popFrontRet();
+					node v = delEdges.popFrontRet();
 
-					setEdge(source, target, origDelEdges.popFrontRet());
+					setEdge(u, v, origDelEdges.popFrontRet());
 				}
 				OGDF_ASSERT(origDelEdges.empty());
 				
