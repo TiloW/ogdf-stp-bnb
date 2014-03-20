@@ -344,10 +344,7 @@ double STPSolver::bnbInternal(double prevCost)
 				while(!movedEdges.empty()) {
 					node v = movedEdges.popFrontRet();
 
-					edge e = m_graph.searchEdge(v, targetNode);
-					if(e == NULL) {
-						e = m_graph.searchEdge(targetNode, v);
-					}
+					edge e = lookupEdge(v, targetNode);
 					OGDF_ASSERT(e != NULL);
 					OGDF_ASSERT(e->opposite(targetNode) != nodeToRemove);
 		
