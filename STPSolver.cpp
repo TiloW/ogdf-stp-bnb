@@ -281,7 +281,7 @@ double STPSolver::bnbInternal(double prevCost)
 				setTerminal(targetNode, true);
 
 				// calculate result on modified graph
-				result = bnbInternal(weightOf(branchingEdge) + prevCost);
+				result = bnbInternal(m_originalWeights[origBranchingEdge] + prevCost);
 				
 				// restore previous graph
 
@@ -321,5 +321,6 @@ double STPSolver::bnbInternal(double prevCost)
 		}
 		//OGDF_ASSERT(validateMapping());
 	}
+
 	return result;
 }
