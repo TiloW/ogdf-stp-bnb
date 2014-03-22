@@ -29,6 +29,8 @@ private:
 	
     	double m_upperBound;
 
+	Array2D<edge> m_edges;
+
 	/**
 	 * Prints the given Steiner tree problem.
 	 * Used solely for debugging.
@@ -141,6 +143,32 @@ private:
 	 *
 	 */
 	bool isTerminal(const node v) const;
+
+	/**
+	 * Sets the edge incident to both node u and v.
+	 * Used for faster lookup.
+	 *
+	 * \param u
+	 *	one of the nodes of the undirected edge
+	 * \param v
+	 *	the opposite node of u
+	 *
+	 */
+	void setEdgeLookup(const node u, const node v, const edge e);
+
+	/**
+	 * Retrieves the edge incident to both node u and v.
+	 *
+	 * \param u
+	 *	one of the nodes of the undirected edge
+	 * \param v
+	 *	the opposite node of u
+	 *
+	 * \return
+	 * 	the edge between u and v
+	 *	NULL if it does not exist
+	 */ 
+	edge lookupEdge(const node u, const node v) const;
 
 	/**
 	 * Decides which edge to branch on.
