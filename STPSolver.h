@@ -55,14 +55,27 @@ private:
 	 * Returns the cost of the specified edge.
 	 * Looks up the corresponding edge in the original graph
 	 * and retrieves its weight.
+	 *
+	 * \param u
+	 * 	one of the nodes incident to the edge to weight
+	 * \param v
+	 * 	the twin node of u
 	 * 
 	 * \return
 	 *   weight of e
 	 */
 	double weightOf(const node u, const node v) const;
-
+	
+	/**
+	 * \param e
+	 * 	the edge as a tuple of two nodes
+	 */
 	double weightOf(const NodeTuple &e) const;
-
+	
+	/**
+	 * \param e
+	 *	the edge in the original graph
+	 */
 	double weightOf(const edge e) const;
 
 	/**
@@ -81,13 +94,41 @@ private:
 	 */
 	double bnbInternal(double prevCost);
 
-	// TODO 
+	/**
+	 * Removes the edge.
+	 * 
+	 * \param u
+	 * 	one of the nodes incident to the edge to weight
+	 * \param v
+	 * 	the twin node of u
+	 */
 	void delEdge(const node u, const node v);
 
-	// TODO
+	/**
+	 * Sets the edge incident to both node u and v to e.
+	 *
+	 * \param u
+	 * 	one of the nodes incident to the edge to weight
+	 * \param v
+	 * 	the twin node of u
+	 * \param e
+	 *	the edge in the original graph
+	 *	with associated weight
+	 *	set to NULL to remove the edge
+	 */
 	void setEdge(const node u, const node v, const edge e);
 
-	// TODO
+	/**
+	 * Move the edge adjacent to node u and v from u to w.
+	 * There must be no edge adjacent to both node v and w. 
+	 *
+	 * \param u
+	 * 	one of the nodes incident to the edge to weight
+	 * \param v
+	 * 	the twin node of u
+	 * \param w
+	 *	the node replacing u
+	 */
 	void moveEdge(const node u, const node v, const node w);
 
 	/**

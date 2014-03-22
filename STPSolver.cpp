@@ -1,5 +1,8 @@
 #include "STPSolver.h"
 
+// tmp
+#include <iostream>
+
 STPSolver::STPSolver(
   const Graph &graph,
   const EdgeArray<double> &weights, 
@@ -210,6 +213,8 @@ STPSolver::NodeTuple STPSolver::determineBranchingEdge(double prevCost) const
 double STPSolver::bnbInternal(double prevCost)
 {
 	double result = MAX_WEIGHT;
+
+	Array2D<edge> tmpEdges(m_edges);
 	
 	if(prevCost < m_upperBound) {
 		if(m_terminals.size() < 2) {
@@ -248,9 +253,9 @@ double STPSolver::bnbInternal(double prevCost)
 				
 				node v;
 				forall_nodes(v, m_originalGraph) {
-					bool deletedEdgeE = false;
 					// TODO: Only consider non-isolated nodes
-					if(weightOf(v, targetNode) < MAX_WEIGHT) {
+					if(weightOf(v, nodeToRemove) < MAX_WEIGHT) {
+						bool doMoveEdge = true;
 						OGDF_ASSERT(v != nodeToRemove);
 						if(weightOf(v, targetNode) < weightOf(v, nodeToRemove)) {
 							delEdges.pushFront(v);
@@ -258,7 +263,7 @@ double STPSolver::bnbInternal(double prevCost)
 							origDelEdges.pushFront(lookupEdge(v, nodeToRemove));
 							delEdge(v, nodeToRemove);
 
-							deletedEdgeE = true;
+							doMoveEdge = false;
 						}
 						else {
 							delEdges.pushFront(v);
@@ -267,7 +272,7 @@ double STPSolver::bnbInternal(double prevCost)
 							delEdge(v, targetNode);
 						}
 		
-						if(!deletedEdgeE) {
+						if(doMoveEdge) {
 							movedEdges.pushFront(v);
 							moveEdge(nodeToRemove, v, targetNode);	
 						}
@@ -325,6 +330,11 @@ double STPSolver::bnbInternal(double prevCost)
 		}
 		//OGDF_ASSERT(validateMapping());
 	}
+
+	int nodeCount = m_originalGraph.numberOfNodes();
+	for(int i = 0; i < nodeCount; i++)
+		for(int ii = 0; ii < nodeCount; ii++)
+			OGDF_ASSERT(tmpEdges(i, ii) == m_edges(i, ii));
 
 	return result;
 }
