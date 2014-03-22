@@ -28,6 +28,9 @@ private:
 	List<node> m_terminals;
 	NodeArray<ListIterator<node>> m_isTerminal;
 	
+	List<node> m_activeNodes;
+	NodeArray<ListIterator<node>> m_nodeIterators;
+	
     	double m_upperBound;
 
 	Array2D<edge> m_edges;

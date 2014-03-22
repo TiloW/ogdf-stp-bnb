@@ -9,12 +9,18 @@ STPSolver::STPSolver(
   const List<node> &terminals) : 
     m_originalGraph(graph),
     m_originalWeights(weights),
-    m_originalTerminals(terminals)
+    m_originalTerminals(terminals),
+    m_nodeIterators(graph)
 {
 	m_upperBound = MAX_WEIGHT;
 	m_isTerminal.init(m_originalGraph, NULL);
 	int nodeCount = m_originalGraph.numberOfNodes();
 	m_edges = Array2D<edge>(0, nodeCount, 0, nodeCount, NULL);
+
+	node v;
+	forall_nodes(v, m_originalGraph) {
+		m_nodeIterators[v] = m_activeNodes.pushFront(v);
+	}
 
 	edge e;
 	forall_edges(e, m_originalGraph) {
@@ -148,8 +154,8 @@ STPSolver::NodeTuple STPSolver::determineBranchingEdge(double prevCost) const
 
 		// investigate all edges of each terminal
 		// calculate lower boundary and find branching edge
-		node v;
-		forall_nodes(v, m_originalGraph) {
+		forall_listiterators(node, it, m_activeNodes) {
+			node v = *it;
 			if(weightOf(t, v) < minWeight) {
 				secondMinWeight = minWeight;
 				minWeight = weightOf(t, v);
@@ -251,8 +257,8 @@ double STPSolver::bnbInternal(double prevCost)
 				List<node> delEdges, movedEdges;
 				List<edge> origDelEdges;
 				
-				node v;
-				forall_nodes(v, m_originalGraph) {
+				forall_listiterators(node, it, m_activeNodes) {
+					node v = *it;
 					// TODO: Only consider non-isolated nodes
 					if(weightOf(v, nodeToRemove) < MAX_WEIGHT) {
 						bool doMoveEdge = true;
@@ -279,9 +285,9 @@ double STPSolver::bnbInternal(double prevCost)
 					}
 				}
 				// nodeToRemove is isolated at this point
-				// thus no need to actually remove it
-				// (easier to keep track of CopyGraph mapping)
-				
+				m_activeNodes.del(m_nodeIterators[nodeToRemove]);
+				m_nodeIterators[nodeToRemove] = NULL;				
+
 				// remove node from terminals too
 				bool targetNodeIsTerminal = isTerminal(targetNode),
 				     nodeToRemoveIsTerminal = isTerminal(nodeToRemove);
@@ -294,6 +300,7 @@ double STPSolver::bnbInternal(double prevCost)
 				result = bnbInternal(m_originalWeights[origBranchingEdge] + prevCost);
 				
 				// restore previous graph
+				m_nodeIterators[nodeToRemove] = m_activeNodes.pushFront(nodeToRemove);
 
 				// restore terminals
 				setTerminal(nodeToRemove, nodeToRemoveIsTerminal);
