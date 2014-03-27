@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
 		List<node> terminals;
 		NodeArray<bool> isTerminal(graph);
 		if(GraphIO::readSTP(graph, terminals, isTerminal, argv[1])) {
-			Graph tree;
+			List<edge> tree;
 			EdgeArray<double> weights(graph);
 
 			// EdgeWeightedGraph will be removed soon from OGDF
@@ -53,6 +53,11 @@ int main(int argc, char* argv[])
 			
 			cout << "Calculation finished after " << timeSpan.count() << " seconds." << endl;
 			cout << "The optimal solution costs " << totalCost << "." << endl;
+/*
+			forall_listiterators(edge, it, tree) {
+				cout << *it << endl;
+			}
+*/
 		}
 		else {
 			std::cerr << "unable to read file: " << argv[1] << endl;

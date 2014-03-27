@@ -31,6 +31,8 @@ private:
 
 	Array2D<edge> m_edges;
 
+	List<edge> m_chosenEdges;
+
 	/**
 	 * Prints the given Steiner tree problem.
 	 * Used solely for debugging.
@@ -74,7 +76,7 @@ private:
 	 *	note: This might be higher then the actual solution if no solution
 	 *	satisfying the upper bound can be found.
 	 */
-	double bnbInternal(double prevCost);
+	double bnbInternal(double prevCost, List<edge> &currentEdges);
 
 	/**
 	 * Removes the specified edge from the graph.
@@ -202,10 +204,10 @@ public:
 	 * Solves the current STP instance.
 	 * Will return the total cost of the optimal solution.
 	 * 
-	 * \param tree
-	 * 	will hold the included edges, not yet implemented
+	 * \param chosenEdges
+	 * 	will hold the included edges
 	 */
-	double solve(Graph &tree);
+	double solve(List<edge> &chosenEdges);
 };
 
 #endif

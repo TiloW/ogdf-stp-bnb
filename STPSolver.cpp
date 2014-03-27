@@ -153,9 +153,18 @@ bool STPSolver::isTerminal(const node v) const
 	return m_isTerminal[v].valid();
 }
 
-double STPSolver::solve(Graph &tree)
+double STPSolver::solve(List<edge> &chosenEdges)
 {
-	return bnbInternal(0);
+	m_chosenEdges.clear();
+	
+	List<edge> tmp;
+	double result = bnbInternal(0, tmp);
+	
+	forall_listiterators(edge, it, m_chosenEdges) {
+		chosenEdges.pushFront(*it);
+	}
+
+	return result;
 }
 
 edge STPSolver::determineBranchingEdge(double prevCost) const
@@ -240,12 +249,17 @@ edge STPSolver::determineBranchingEdge(double prevCost) const
 	return result;
 }
 
-double STPSolver::bnbInternal(double prevCost)
+double STPSolver::bnbInternal(double prevCost, List<edge> &currentEdges)
 {
 	double result = MAX_WEIGHT;
 	
-	if(prevCost < m_upperBound) {
+	if(prevCost <= m_upperBound) {
 		if(m_terminals.size() < 2) {
+			// update currently chosen edges
+			if(prevCost != m_upperBound || m_chosenEdges.empty()) {
+				
+				m_chosenEdges = List<edge>(currentEdges);
+			}
 			// all terminals are connected
 			m_upperBound = prevCost;
 			result = prevCost;
@@ -332,9 +346,13 @@ double STPSolver::bnbInternal(double prevCost)
 				setTerminal(targetNode, true);
 
 				// calculate result on modified graph
-				result = bnbInternal(weightOf(branchingEdge) + prevCost);
+				currentEdges.pushFront(origBranchingEdge);
+				result = bnbInternal(weightOf(branchingEdge) + prevCost, currentEdges);
+				OGDF_ASSERT(currentEdges.front() == origBranchingEdge);
+				currentEdges.popFront();
 				
 				// restore previous graph
+
 
 				// restore terminals
 				setTerminal(nodeToRemove, nodeToRemoveIsTerminal);
@@ -368,7 +386,7 @@ double STPSolver::bnbInternal(double prevCost)
 				OGDF_ASSERT(origDelEdges.empty());
 				
 				// sencond branch: Exclusion of the edge
-				double exEdgeResult = bnbInternal(prevCost);
+				double exEdgeResult = bnbInternal(prevCost, currentEdges);
 
 				// decide which branch returned best result
 				if(exEdgeResult < result) {

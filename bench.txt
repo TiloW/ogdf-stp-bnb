@@ -17,3 +17,6 @@ data/B/b13.stp		165
 #data/B/b16.stp		127
 #data/B/b17.stp		131
 #data/B/b18.stp		218
+#data/P4Z/p401.stp	155
+#data/P4Z/p402.stp	116
+#data/P4Z/p408.stp	590
