@@ -220,7 +220,7 @@ double STPSolver::bnbInternal(double prevCost)
 {
 	double result = MAX_WEIGHT;
 
-	Array2D<edge> tmpEdges(m_edges);
+	//Array2D<edge> tmpEdges(m_edges);
 	
 	if(prevCost < m_upperBound) {
 		if(m_terminals.size() < 2) {
@@ -337,11 +337,11 @@ double STPSolver::bnbInternal(double prevCost)
 		}
 		//OGDF_ASSERT(validateMapping());
 	}
-
+/*
 	int nodeCount = m_originalGraph.numberOfNodes();
 	for(int i = 0; i < nodeCount; i++)
 		for(int ii = 0; ii < nodeCount; ii++)
 			OGDF_ASSERT(tmpEdges(i, ii) == m_edges(i, ii));
-
+*/
 	return result;
 }

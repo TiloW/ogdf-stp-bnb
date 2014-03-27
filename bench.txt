@@ -10,8 +10,8 @@ data/B/b08.stp		104
 data/B/b09.stp		220
 data/B/b10.stp		86
 data/B/b11.stp		88
-#data/B/b12.stp		174
-#data/B/b13.stp		165
+data/B/b12.stp		174
+data/B/b13.stp		165
 #data/B/b14.stp		235
 #data/B/b15.stp		318
 #data/B/b16.stp		127
